@@ -7,6 +7,11 @@ retention_days="${BACKUP_RETENTION_DAYS:-30}"
 backup_once() {
     [ -s /data/beacon.db ] || return 1
 
+    # A SQLite file can exist before EF has finished applying the production schema.
+    # Do not publish a recovery point until it is recognisably a Beacon database.
+    [ "$(sqlite3 /data/beacon.db "SELECT COUNT(*) FROM sqlite_schema WHERE type = 'table' AND name = '__EFMigrationsHistory';")" = "1" ] || return 1
+    [ "$(sqlite3 /data/beacon.db 'SELECT COUNT(*) FROM __EFMigrationsHistory;')" -gt 0 ] || return 1
+
     stamp="$(date -u +%Y%m%dT%H%M%SZ)"
     work="$(mktemp -d)"
     partial="/backups/.beacon-${stamp}.tar.gz.partial"
@@ -19,7 +24,10 @@ backup_once() {
 .backup '$work/beacon.db'
 EOF
 
+    [ -s "$work/beacon.db" ]
     [ "$(sqlite3 "$work/beacon.db" 'PRAGMA integrity_check;')" = "ok" ]
+    [ "$(sqlite3 "$work/beacon.db" "SELECT COUNT(*) FROM sqlite_schema WHERE type = 'table' AND name = '__EFMigrationsHistory';")" = "1" ]
+    [ "$(sqlite3 "$work/beacon.db" 'SELECT COUNT(*) FROM __EFMigrationsHistory;')" -gt 0 ]
 
     mkdir -p "$work/images"
     if [ -d /data/images ]; then

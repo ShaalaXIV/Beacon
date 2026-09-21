@@ -48,6 +48,17 @@ try {
         throw 'The production stack enables the Development environment.'
     }
 
+    $backupScript = Get-Content -LiteralPath 'deploy/backup.sh' -Raw
+    foreach ($required in @(
+        'PRAGMA integrity_check;',
+        '__EFMigrationsHistory',
+        '[ -s "$work/beacon.db" ]'
+    )) {
+        if ($backupScript.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+            throw "Backup recovery invariant is missing: $required"
+        }
+    }
+
     if (-not $AllowDirty) {
         $dirty = @(& git status --porcelain)
         if ($dirty.Count -gt 0) {
