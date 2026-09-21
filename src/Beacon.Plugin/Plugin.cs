@@ -354,6 +354,7 @@ public sealed class Plugin : IDalamudPlugin
 
         dtr.Dispose();
         profiles.Dispose();
+        profileEditorWindow.Dispose();
         screenshots.Dispose();
         travel.Dispose();
         atlas.Dispose();

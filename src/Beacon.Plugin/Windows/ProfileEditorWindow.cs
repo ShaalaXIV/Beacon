@@ -3,6 +3,7 @@ using Beacon.Services;
 using Beacon.Shared.Profiles;
 using Beacon.UI;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Interface.Textures.TextureWraps;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Windowing;
 
@@ -16,8 +17,14 @@ namespace Beacon.Windows;
 /// go. A form that demands ten sections before it will accept anything is a form people abandon, and
 /// an empty Chronicle helps nobody.
 /// </summary>
-public sealed class ProfileEditorWindow : Window
+public sealed class ProfileEditorWindow : Window, IDisposable
 {
+    private const float PortraitAspect = 5f / 6f;
+    private const int PortraitOutputWidth = 600;
+    private const int PortraitOutputHeight = 720;
+    private const int PortraitSourceMaxBytes = 25 * 1024 * 1024;
+    private const long PortraitSourceMaxPixels = 50_000_000;
+
     private readonly Configuration config;
 
     private readonly ProfileService profiles;
@@ -65,8 +72,12 @@ public sealed class ProfileEditorWindow : Window
     private ProfileVisibility visibility = ProfileVisibility.Public;
     private AvailabilityOverride availability = AvailabilityOverride.Derived;
 
-    private byte[]? pendingPortrait;
+    private IDalamudTextureWrap? pendingPortraitTexture;
     private string? pendingPortraitName;
+    private float portraitZoom = 1f;
+    private float portraitPanX = 0.5f;
+    private float portraitPanY = 0.5f;
+    private bool portraitLoading;
 
     private string? validationError;
     private bool saving;
@@ -108,8 +119,9 @@ public sealed class ProfileEditorWindow : Window
     {
         validationError = null;
         saving = false;
-        pendingPortrait = null;
+        DisposePendingPortrait();
         pendingPortraitName = null;
+        ResetPortraitCrop();
         editing = profile;
 
         traits.Clear();
@@ -279,45 +291,131 @@ public sealed class ProfileEditorWindow : Window
 
     private void DrawPortraitSlot(float scale)
     {
-        var size = 96f * scale;
+        var size = 180f * scale;
         var origin = ImGui.GetCursorScreenPos();
         var draw = ImGui.GetWindowDrawList();
-        var box = new Vector2(origin.X + size, origin.Y + (size * 1.2f));
+        var box = new Vector2(origin.X + size, origin.Y + (size / PortraitAspect));
 
-        var texture = pendingPortrait is null && editing?.PortraitImageId is { } id
-            ? images.Get(id, thumb: false)
-            : null;
+        var texture = pendingPortraitTexture
+                      ?? (editing?.PortraitImageId is { } id ? images.Get(id, thumb: false) : null);
 
         if (texture is not null)
-            draw.AddImage(texture.Handle, origin, box);
+        {
+            var (uv0, uv1) = CropUvs(texture);
+            draw.AddImage(texture.Handle, origin, box, uv0, uv1);
+        }
         else
             draw.AddRectFilled(origin, box, Theme.Well.Packed());
 
         draw.AddRect(origin, box, Theme.Brass.Packed(), 0f, ImDrawFlags.None, 1.4f * scale);
 
-        if (pendingPortrait is not null)
+        if (portraitLoading)
         {
-            const string Ready = "New portrait";
-            var textSize = ImGui.CalcTextSize(Ready);
+            const string Loading = "Loading...";
+            var textSize = ImGui.CalcTextSize(Loading);
             draw.AddText(
-                new Vector2(origin.X + ((size - textSize.X) / 2f), origin.Y + ((size * 1.2f - textSize.Y) / 2f)),
+                new Vector2(origin.X + ((size - textSize.X) / 2f), origin.Y + (((size / PortraitAspect) - textSize.Y) / 2f)),
                 Theme.Verdigris.Packed(),
-                Ready);
+                Loading);
         }
 
-        ImGui.Dummy(new Vector2(size, size * 1.2f));
+        ImGui.Dummy(new Vector2(size, size / PortraitAspect));
 
-        if (ImGui.Button("Choose file", new Vector2(size, 0)))
+        if (!saving && !portraitLoading && ImGui.Button("Choose picture", new Vector2(size, 0)))
         {
             screenshots.PickFile((bytes, fileName) =>
             {
-                pendingPortrait = bytes;
-                pendingPortraitName = fileName;
-            });
+                _ = LoadPortraitAsync(bytes, fileName);
+            }, PortraitSourceMaxBytes);
+        }
+
+        if (pendingPortraitTexture is not null)
+        {
+            Ornament.PageLabel("Crop portrait");
+
+            ImGui.SetNextItemWidth(size);
+            ImGui.SliderFloat("##portraitZoom", ref portraitZoom, 1f, 4f, "Zoom %.1fx");
+
+            Ornament.Text(Theme.MutedDeep, "Left / right");
+            ImGui.SetNextItemWidth(size);
+            ImGui.SliderFloat("##portraitPanX", ref portraitPanX, 0f, 1f, string.Empty);
+
+            Ornament.Text(Theme.MutedDeep, "Up / down");
+            ImGui.SetNextItemWidth(size);
+            ImGui.SliderFloat("##portraitPanY", ref portraitPanY, 0f, 1f, string.Empty);
+
+            if (ImGui.SmallButton("Center crop"))
+                ResetPortraitCrop();
         }
 
         if (screenshots.LastError is { } error)
             Ornament.TextWrapped(Theme.Wax, error);
+    }
+
+    private async Task LoadPortraitAsync(byte[] bytes, string fileName)
+    {
+        portraitLoading = true;
+        validationError = null;
+
+        try
+        {
+            var texture = await Svc.Textures.CreateFromImageAsync(
+                bytes,
+                debugName: "Beacon portrait preview");
+
+            if ((long)texture.Width * texture.Height > PortraitSourceMaxPixels)
+            {
+                texture.Dispose();
+                validationError = "That picture has too many pixels. Resize it below 50 megapixels first.";
+                return;
+            }
+
+            DisposePendingPortrait();
+            pendingPortraitTexture = texture;
+            pendingPortraitName = Path.ChangeExtension(fileName, ".png");
+            ResetPortraitCrop();
+        }
+        catch (Exception ex)
+        {
+            Svc.Log.Warning(ex, "Beacon: could not decode the chosen portrait.");
+            validationError = "Beacon could not open that picture. Try a PNG or JPEG instead.";
+        }
+        finally
+        {
+            portraitLoading = false;
+        }
+    }
+
+    private (Vector2 Uv0, Vector2 Uv1) CropUvs(IDalamudTextureWrap texture)
+    {
+        var imageAspect = texture.Width / (float)texture.Height;
+        var cropWidth = imageAspect > PortraitAspect ? PortraitAspect / imageAspect : 1f;
+        var cropHeight = imageAspect > PortraitAspect ? 1f : imageAspect / PortraitAspect;
+
+        cropWidth /= portraitZoom;
+        cropHeight /= portraitZoom;
+
+        var halfWidth = cropWidth / 2f;
+        var halfHeight = cropHeight / 2f;
+        var centerX = halfWidth + (portraitPanX * (1f - cropWidth));
+        var centerY = halfHeight + (portraitPanY * (1f - cropHeight));
+
+        return (
+            new Vector2(centerX - halfWidth, centerY - halfHeight),
+            new Vector2(centerX + halfWidth, centerY + halfHeight));
+    }
+
+    private void ResetPortraitCrop()
+    {
+        portraitZoom = 1f;
+        portraitPanX = 0.5f;
+        portraitPanY = 0.5f;
+    }
+
+    private void DisposePendingPortrait()
+    {
+        pendingPortraitTexture?.Dispose();
+        pendingPortraitTexture = null;
     }
 
     // --- Character -------------------------------------------------------
@@ -605,7 +703,7 @@ public sealed class ProfileEditorWindow : Window
         DrawCompletionMeter(scale);
 
         if (Ornament.AccentButton(saving ? "Saving..." : "Save my card", new Vector2(150f * scale, 28f * scale), !saving))
-            Submit();
+            _ = SubmitAsync();
 
         ImGui.SameLine();
         if (ImGui.Button("Close", new Vector2(90f * scale, 28f * scale)))
@@ -640,7 +738,7 @@ public sealed class ProfileEditorWindow : Window
         var earned = 0;
         const int Total = 8;
 
-        if (pendingPortrait is not null || editing?.HasPortrait == true) earned++;
+        if (pendingPortraitTexture is not null || editing?.HasPortrait == true) earned++;
         if (!string.IsNullOrWhiteSpace(name)) earned++;
         if (traits.Count > 0) earned++;
         if (hooks.Any(h => !string.IsNullOrWhiteSpace(h))) earned++;
@@ -670,7 +768,7 @@ public sealed class ProfileEditorWindow : Window
             fraction >= 1f ? "A full card" : $"{earned} of {Total} filled  ·  publish whenever you like");
     }
 
-    private void Submit()
+    private async Task SubmitAsync()
     {
         var trimmed = name.Trim();
 
@@ -734,15 +832,36 @@ public sealed class ProfileEditorWindow : Window
             Availability = availability,
         };
 
-        profiles.Save(request, pendingPortrait, pendingPortraitName, saved =>
+        byte[]? portrait = null;
+        if (pendingPortraitTexture is not null)
+        {
+            var (uv0, uv1) = CropUvs(pendingPortraitTexture);
+            portrait = await screenshots.CropToPngAsync(
+                pendingPortraitTexture,
+                uv0,
+                uv1,
+                PortraitOutputWidth,
+                PortraitOutputHeight);
+
+            if (portrait is null)
+            {
+                validationError = screenshots.LastError ?? "Could not prepare that portrait for upload.";
+                saving = false;
+                return;
+            }
+        }
+
+        profiles.Save(request, portrait, pendingPortraitName, saved =>
         {
             saving = false;
             editing = saved;
-            pendingPortrait = null;
+            DisposePendingPortrait();
             pendingPortraitName = null;
             IsOpen = false;
         });
     }
 
     private static string? Blank(string value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    public void Dispose() => DisposePendingPortrait();
 }

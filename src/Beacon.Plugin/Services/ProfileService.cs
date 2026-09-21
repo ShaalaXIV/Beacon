@@ -295,9 +295,36 @@ public sealed class ProfileService(
             // with nothing to attach it to is nothing.
             if (portrait is { Length: > 0 })
             {
+                var previousImages = profile.Gallery.Select(image => image.ImageId).ToHashSet();
                 var uploaded = await api.UploadPortraitAsync(profile.Id, portrait, fileName ?? "portrait.png", lifetime.Token);
                 if (uploaded.Ok && uploaded.Value is { } withImage)
+                {
                     profile = withImage;
+
+                    var newImage = withImage.Gallery.FirstOrDefault(image => !previousImages.Contains(image.ImageId));
+                    if (newImage is not null && withImage.PortraitImageId != newImage.ImageId)
+                    {
+                        var selected = await api.UpdateGalleryAsync(
+                            profile.Id,
+                            new UpdateGalleryRequest
+                            {
+                                PortraitImageId = newImage.ImageId,
+                                Images = withImage.Gallery.Select(image => new UpdateGalleryRequest.GalleryEntry
+                                {
+                                    ImageId = image.ImageId,
+                                    Category = image.Category,
+                                    Caption = image.Caption,
+                                    Order = image.Order,
+                                }).ToList(),
+                            },
+                            lifetime.Token);
+
+                        if (selected.Ok && selected.Value is { } withPortrait)
+                            profile = withPortrait;
+                        else
+                            Post(() => LastError = $"The picture uploaded, but could not be selected as the portrait: {selected.Error}");
+                    }
+                }
                 else
                     Post(() => LastError = $"The card was saved, but the portrait did not upload: {uploaded.Error}");
             }
