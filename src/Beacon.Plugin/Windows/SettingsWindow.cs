@@ -148,7 +148,7 @@ public sealed class SettingsWindow : Window
         Ornament.PageLabel("How you want to be credited on your beacons");
 
         ImGui.SetNextItemWidth(220f * scale);
-        ImGui.InputTextWithHint("##name", "Shaala Xiv", ref displayName, BeaconLimits.DisplayNameMaxLength);
+        ImGui.InputTextWithHint("##name", "account name", ref displayName, BeaconLimits.DisplayNameMaxLength);
 
         if (Ornament.AccentButton(registering ? "Creating..." : "Create an account", new Vector2(180f * scale, 26f * scale), !registering))
             _ = RegisterAsync();
