@@ -33,3 +33,5 @@ jobs:
         run: ./tools/smoke-server.ps1
       - name: Build production container
         run: docker build --tag beacon-server:ci .
+      - name: Exercise backup and restore contract
+        run: sh ./tools/smoke-backup.sh
