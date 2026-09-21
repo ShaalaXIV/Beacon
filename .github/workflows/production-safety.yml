@@ -1,0 +1,35 @@
+name: Production safety
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  server-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: |
+            src/Compass.Server/packages.lock.json
+            src/Compass.Shared/packages.lock.json
+      - name: Check release invariants
+        shell: pwsh
+        run: ./tools/verify-release.ps1 -SkipBuild -AllowDirty
+      - name: Restore locked server dependencies
+        run: dotnet restore src/Compass.Server/Compass.Server.csproj --locked-mode
+      - name: Build server
+        run: dotnet build src/Compass.Server/Compass.Server.csproj -c Release --no-restore --nologo
+      - name: Exercise API contract and persistence
+        shell: pwsh
+        run: ./tools/smoke-server.ps1
+      - name: Build production container
+        run: docker build --tag compass-server:ci .

@@ -1,0 +1,13 @@
+# Line endings.
+#
+# Git on Windows normally converts files to CRLF on checkout, which is harmless for C# and fatal for a
+# shell script: a CRLF shebang makes Linux report "bad interpreter: /usr/bin/env bash^M" and refuse to
+# run it. Since the server is built and deployed on Linux, publish.sh has to survive a checkout made on
+# Windows, so its line endings are pinned here rather than left to whatever each machine prefers.
+#
+# Batch files are pinned the other way for the same reason in reverse: cmd.exe is unreliable with LF.
+
+*.sh text eol=lf
+
+*.cmd text eol=crlf
+*.bat text eol=crlf

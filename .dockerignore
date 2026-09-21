@@ -1,0 +1,16 @@
+.git
+.github
+.vs
+.idea
+assets
+docs
+publish
+tools
+var
+**/bin
+**/obj
+**/var
+**/*.user
+**/*.suo
+src/Compass.Plugin
+src/Compass.Server/appsettings.Development.json

@@ -1,0 +1,89 @@
+services:
+  compass-server:
+    image: compass-server:0.1.0
+    restart: always
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://0.0.0.0:8080
+      Compass__DataDirectory: /var/lib/compass
+      Compass__TrustedProxies__0: 172.30.249.2
+      DOTNET_EnableDiagnostics: "0"
+      COMPASS_HEALTH_URL: http://127.0.0.1:8080/health
+    volumes:
+      - /opt/portainer/compass/data:/var/lib/compass
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      compass-internal:
+        ipv4_address: 172.30.249.3
+    healthcheck:
+      test: ["CMD", "dotnet", "Compass.Server.dll", "--health-check"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  compass-gateway:
+    image: nginx:1.28.0-alpine@sha256:30f1c0d78e0ad60901648be663a710bdadf19e4c10ac6782c235200619158284
+    restart: always
+    depends_on:
+      compass-server:
+        condition: service_healthy
+    ports:
+      - "61249:443"
+    volumes:
+      - /opt/portainer/compass/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - /data/compose/1/letsencrypt:/etc/letsencrypt:ro
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx:size=32m,mode=0755
+      - /var/run:size=4m,mode=0755
+      - /tmp:size=16m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      compass-internal:
+        ipv4_address: 172.30.249.2
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --no-check-certificate -O /dev/null https://127.0.0.1/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    command: >-
+      /bin/sh -c '(while sleep 86400; do nginx -s reload; done) & exec nginx -g "daemon off;"'
+
+  compass-backup:
+    image: compass-backup:0.1.0
+    restart: always
+    environment:
+      BACKUP_INTERVAL_SECONDS: "86400"
+      BACKUP_RETENTION_DAYS: "30"
+    volumes:
+      - /opt/portainer/compass/data:/data:ro
+      - /opt/portainer/compass/backups:/backups
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    network_mode: none
+    healthcheck:
+      test: ["CMD-SHELL", "find /backups -maxdepth 1 -type f -name 'compass-*.tar.gz' -mmin -1560 | grep -q ."]
+      interval: 30m
+      timeout: 5s
+      retries: 3
+      start_period: 2m
+
+networks:
+  compass-internal:
+    ipam:
+      config:
+        - subnet: 172.30.249.0/28

@@ -1,0 +1,28 @@
+# Build output
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+*.user
+*.suo
+
+# Deployable artifacts, produced by publish.cmd.
+publish/
+
+# Server runtime state: the SQLite database and uploaded screenshots.
+# Back this directory up; never commit it. The root rule matters too: an early development run used
+# that location, and allowing it into history would publish account/profile data and screenshots.
+/var/
+src/Compass.Server/var/
+
+# Local deployment scratch space. Production state lives on the server under /opt/portainer/compass.
+/.deploy-local/
+
+# IDE
+.vs/
+.idea/
+*.DotSettings.user
+
+# OS
+Thumbs.db
+.DS_Store

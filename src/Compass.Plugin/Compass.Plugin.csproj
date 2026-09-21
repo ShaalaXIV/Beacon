@@ -1,0 +1,56 @@
+<Project Sdk="Dalamud.NET.Sdk/15.0.0">
+
+  <PropertyGroup>
+    <!-- Drives the built DLL, the generated manifest, and the folder Dalamud loads it from. -->
+    <AssemblyName>Compass</AssemblyName>
+    <RootNamespace>Compass</RootNamespace>
+    <Version>0.1.0.0</Version>
+    <!-- The Dalamud SDK does not turn these on, and every service file wants System.Threading.Tasks. -->
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <!-- Consumed by DalamudPackager to generate Compass.json next to the assembly. -->
+  <PropertyGroup>
+    <Name>Compass</Name>
+    <Author>Scott</Author>
+    <Punchline>Find the fires. Light your own.</Punchline>
+    <Description>A directory of roleplay beacons anywhere in the world, not just in housing wards. Raise a beacon where your camp, court or crossroads actually is, describe it, show a screenshot, and let anyone travel to it across worlds and data centres. Light your beacon when you are there and open to play, and the atlas shows who is out there right now. Use /compass to open the atlas.</Description>
+    <Tags>roleplay;rp;travel;social;beacons</Tags>
+    <CategoryTags>other</CategoryTags>
+    <ApplicableVersion>any</ApplicableVersion>
+    <AcceptsFeedback>true</AcceptsFeedback>
+    <IconUrl>https://plugins.aethercast.org/images/compass.png</IconUrl>
+    <RepoUrl>https://github.com/ShaalaXIV/Compass</RepoUrl>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Compass.Shared\Compass.Shared.csproj" />
+  </ItemGroup>
+
+  <!--
+    Opt-in deploy straight into the Dalamud devPlugins folder, so a build is immediately loadable in
+    game. Off by default: a build should not write outside the repo unless you asked it to.
+    Enable with:  dotnet build -p:DeployToDevPlugins=true
+  -->
+  <Target Name="DeployToDevPlugins"
+          AfterTargets="Build"
+          Condition="'$(DeployToDevPlugins)' == 'true' AND '$(OS)' == 'Windows_NT'">
+    <PropertyGroup>
+      <DevPluginDir>$(AppData)\XIVLauncher\devPlugins\$(AssemblyName)\</DevPluginDir>
+    </PropertyGroup>
+    <ItemGroup>
+      <!--
+        Exclude the packager's own staging folder ($(OutputPath)$(AssemblyName)/), which holds
+        latest.zip and a duplicate manifest for release publishing. Copying it would nest a second
+        Compass.json inside the loaded plugin directory.
+      -->
+      <DeployFiles Include="$(OutputPath)**\*.*" Exclude="$(OutputPath)$(AssemblyName)\**\*.*" />
+    </ItemGroup>
+    <MakeDir Directories="$(DevPluginDir)" />
+    <Copy SourceFiles="@(DeployFiles)"
+          DestinationFiles="@(DeployFiles->'$(DevPluginDir)%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+    <Message Importance="high" Text="Compass deployed to $(DevPluginDir)" />
+  </Target>
+
+</Project>
