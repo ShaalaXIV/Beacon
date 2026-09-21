@@ -1,4 +1,8 @@
-# Beacon
+<p align="center">
+  <img src="assets/beacon.png" alt="Beacon torch" width="240">
+</p>
+
+<h1 align="center">Beacon</h1>
 
 **Find the fires. Light your own.**
 
