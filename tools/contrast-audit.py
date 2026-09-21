@@ -1,5 +1,5 @@
 """
-Contrast audit for the Compass palette.
+Contrast audit for the Beacon palette.
 
 Reads the colours straight out of Theme.cs and checks every foreground/background pairing the UI
 actually uses. Exists because "dark text on a dark background" is not a bug you can reliably catch by
@@ -16,7 +16,7 @@ import re
 import sys
 from pathlib import Path
 
-THEME = Path(__file__).resolve().parent.parent / "src" / "Compass.Plugin" / "UI" / "Theme.cs"
+THEME = Path(__file__).resolve().parent.parent / "src" / "Beacon.Plugin" / "UI" / "Theme.cs"
 
 # WCAG AA: 4.5:1 for body text, 3:1 for large/bold text and meaningful non-text marks.
 BODY = 4.5

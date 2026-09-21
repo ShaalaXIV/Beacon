@@ -1,4 +1,4 @@
-# Deploying Compass
+# Deploying Beacon
 
 Two things ship: the **server**, which you run somewhere your community can reach, and the **plugin**,
 which they install. The plugin is useless without a server to point at, so do the server first.
@@ -36,14 +36,14 @@ installed. Add `--self-contained true` to `publish.sh` if you would rather not m
 
 ### 1. Put the data somewhere a redeploy cannot reach
 
-`Compass:DataDirectory` defaults to `var`, **relative to the application folder**. That is right for
+`Beacon:DataDirectory` defaults to `var`, **relative to the application folder**. That is right for
 local development and wrong for a deployment: the application folder is the folder you replace when
 you update, and replacing it destroys every account, beacon and profile on the server.
 
 Set an absolute path outside the deployment:
 
 ```bash
-Compass__DataDirectory=/var/lib/compass
+Beacon__DataDirectory=/var/lib/beacon
 ```
 
 The server refuses to start in Production when this path is relative. That failure is intentional: a
@@ -55,7 +55,7 @@ up the whole service.
 
 ### 2. Put it behind TLS
 
-Every authenticated request carries the account's secret key in an `X-Compass-Key` header. Over plain
+Every authenticated request carries the account's secret key in an `X-Beacon-Key` header. Over plain
 HTTP that key is readable by anything between the player and you, and it is the only credential
 guarding their beacons and profile.
 
@@ -67,7 +67,7 @@ The plugin switches to `wss://` for the realtime hub automatically when the base
 ## Behind a reverse proxy, name it
 
 ```bash
-Compass__TrustedProxies__0=127.0.0.1
+Beacon__TrustedProxies__0=127.0.0.1
 ```
 
 Without this, every request appears to originate from the proxy. The rate limiter partitions anonymous
@@ -81,8 +81,8 @@ spoof its own address by sending `X-Forwarded-For` itself.
 
 ## Configuration
 
-Everything lives under the `Compass` section, settable in `appsettings.json` or as environment
-variables using `Compass__Name` (double underscore).
+Everything lives under the `Beacon` section, settable in `appsettings.json` or as environment
+variables using `Beacon__Name` (double underscore).
 
 | Setting | Default | Notes |
 |---|---|---|
@@ -113,61 +113,61 @@ Bind to loopback when a proxy sits in front. There is no reason for the app itse
 
 The checked-in Portainer deployment is `deploy/portainer-stack.yml`. The Aethercast deployment uses
 immutable versioned images, publishes HTTPS on port `61249`, stores live state under
-`/opt/portainer/compass/data`, stores 30 days of verified daily backups under
-`/opt/portainer/compass/backups`, and reloads the existing `plugins.aethercast.org` certificate daily.
+`/opt/portainer/beacon/data`, stores 30 days of verified daily backups under
+`/opt/portainer/beacon/backups`, and reloads the existing `plugins.aethercast.org` certificate daily.
 The application container itself is never published directly.
 
 The systemd example below is an alternative for hosts that do not use Portainer.
 
 ```bash
-sudo useradd --system --home /var/lib/compass --create-home compass
-sudo mkdir -p /opt/compass && sudo cp -r publish/server-linux-x64/* /opt/compass/
-sudo chown -R compass:compass /opt/compass /var/lib/compass
+sudo useradd --system --home /var/lib/beacon --create-home beacon
+sudo mkdir -p /opt/beacon && sudo cp -r publish/server-linux-x64/* /opt/beacon/
+sudo chown -R beacon:beacon /opt/beacon /var/lib/beacon
 ```
 
-`/etc/systemd/system/compass.service`:
+`/etc/systemd/system/beacon.service`:
 
 ```ini
 [Unit]
-Description=Compass
+Description=Beacon
 After=network.target
 
 [Service]
 Type=simple
-User=compass
-WorkingDirectory=/opt/compass
-ExecStart=/opt/compass/Compass.Server
+User=beacon
+WorkingDirectory=/opt/beacon
+ExecStart=/opt/beacon/Beacon.Server
 Restart=always
 RestartSec=5
 
 Environment=ASPNETCORE_ENVIRONMENT=Production
 Environment=ASPNETCORE_URLS=http://127.0.0.1:5215
-Environment=Compass__DataDirectory=/var/lib/compass
-Environment=Compass__TrustedProxies__0=127.0.0.1
+Environment=Beacon__DataDirectory=/var/lib/beacon
+Environment=Beacon__TrustedProxies__0=127.0.0.1
 
 # The service needs nothing outside its own two directories.
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/lib/compass
+ReadWritePaths=/var/lib/beacon
 
 [Install]
 WantedBy=multi-user.target
 ```
 
 ```bash
-sudo systemctl enable --now compass
-journalctl -u compass -f
+sudo systemctl enable --now beacon
+journalctl -u beacon -f
 ```
 
-Note that `/var/lib/compass` sits outside `/opt/compass`, so replacing the application directory on an
+Note that `/var/lib/beacon` sits outside `/opt/beacon`, so replacing the application directory on an
 update cannot touch the data. That separation is the whole point of the warning above.
 
 A Caddyfile is the shortest route to TLS:
 
 ```
-compass.example.com {
+beacon.example.com {
     reverse_proxy 127.0.0.1:5215
 }
 ```
@@ -193,19 +193,19 @@ that belongs in a config file you control rather than in a screen somebody could
 
 ## Distributing the plugin
 
-`publish\plugin\` contains `Compass.dll`, its manifest, and `Compass\latest.zip` — the zip a Dalamud
+`publish\plugin\` contains `Beacon.dll`, its manifest, and `Beacon\latest.zip` — the zip a Dalamud
 third-party repository serves.
 
 Two ways to get it to people:
 
 - **A repository JSON** they add under Dalamud's experimental settings. This is what makes updates
   automatic, and it is worth the setup if more than a handful of people will use it.
-- **Hand them the folder** to drop into `%AppData%\XIVLauncher\devPlugins\Compass\`. Fine for testing
+- **Hand them the folder** to drop into `%AppData%\XIVLauncher\devPlugins\Beacon\`. Fine for testing
   with a few friends, tedious beyond that.
 
 Before distributing a fork, change the plugin's default `ServerUrl` to that fork's public HTTPS
 endpoint. The Aethercast release is already pinned to `https://plugins.aethercast.org:61249` in
-`src/Compass.Plugin/Services/Configuration.cs`.
+`src/Beacon.Plugin/Services/Configuration.cs`.
 
 ---
 

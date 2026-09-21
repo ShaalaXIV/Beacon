@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Beacon.Plugin/Beacon.Plugin.csproj" />
+    <Project Path="src/Beacon.Server/Beacon.Server.csproj" />
+    <Project Path="src/Beacon.Shared/Beacon.Shared.csproj" />
+  </Folder>
+</Solution>

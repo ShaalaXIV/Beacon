@@ -5,36 +5,36 @@ interval="${BACKUP_INTERVAL_SECONDS:-86400}"
 retention_days="${BACKUP_RETENTION_DAYS:-30}"
 
 backup_once() {
-    [ -s /data/compass.db ] || return 1
+    [ -s /data/beacon.db ] || return 1
 
     stamp="$(date -u +%Y%m%dT%H%M%SZ)"
     work="$(mktemp -d)"
-    partial="/backups/.compass-${stamp}.tar.gz.partial"
-    final="/backups/compass-${stamp}.tar.gz"
+    partial="/backups/.beacon-${stamp}.tar.gz.partial"
+    final="/backups/beacon-${stamp}.tar.gz"
 
     trap 'rm -rf "$work" "$partial"' EXIT INT TERM
 
-    sqlite3 /data/compass.db <<EOF
+    sqlite3 /data/beacon.db <<EOF
 .timeout 30000
-.backup '$work/compass.db'
+.backup '$work/beacon.db'
 EOF
 
-    [ "$(sqlite3 "$work/compass.db" 'PRAGMA integrity_check;')" = "ok" ]
+    [ "$(sqlite3 "$work/beacon.db" 'PRAGMA integrity_check;')" = "ok" ]
 
     mkdir -p "$work/images"
     if [ -d /data/images ]; then
         cp -a /data/images/. "$work/images/"
     fi
 
-    tar -C "$work" -czf "$partial" compass.db images
+    tar -C "$work" -czf "$partial" beacon.db images
     mv "$partial" "$final"
     sha256sum "$final" | sed 's#  /backups/#  #' > "${final}.sha256"
 
     rm -rf "$work"
     trap - EXIT INT TERM
 
-    find /backups -maxdepth 1 -type f -name 'compass-*.tar.gz' -mtime "+$retention_days" -delete
-    find /backups -maxdepth 1 -type f -name 'compass-*.tar.gz.sha256' -mtime "+$retention_days" -delete
+    find /backups -maxdepth 1 -type f -name 'beacon-*.tar.gz' -mtime "+$retention_days" -delete
+    find /backups -maxdepth 1 -type f -name 'beacon-*.tar.gz.sha256' -mtime "+$retention_days" -delete
 }
 
 while :; do

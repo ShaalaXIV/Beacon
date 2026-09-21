@@ -5,7 +5,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$scratch = Join-Path ([System.IO.Path]::GetTempPath()) ("compass-smoke-" + [guid]::NewGuid().ToString('N'))
+$scratch = Join-Path ([System.IO.Path]::GetTempPath()) ("beacon-smoke-" + [guid]::NewGuid().ToString('N'))
 $published = Join-Path $scratch 'server'
 $data = Join-Path $scratch 'data'
 $process = $null
@@ -21,26 +21,26 @@ function Get-FreeLoopbackPort {
     }
 }
 
-function Start-CompassServer([int]$Port) {
+function Start-BeaconServer([int]$Port) {
     $start = [System.Diagnostics.ProcessStartInfo]::new()
     $start.FileName = 'dotnet'
-    $start.ArgumentList.Add((Join-Path $published 'Compass.Server.dll'))
+    $start.ArgumentList.Add((Join-Path $published 'Beacon.Server.dll'))
     $start.WorkingDirectory = $published
     $start.UseShellExecute = $false
     $start.CreateNoWindow = $true
     $null = $start.Environment.Remove('ASPNETCORE_ENVIRONMENT')
     $null = $start.Environment.Remove('ASPNETCORE_URLS')
-    $null = $start.Environment.Remove('Compass__DataDirectory')
-    $null = $start.Environment.Remove('Compass__RegistrationsPerHour')
+    $null = $start.Environment.Remove('Beacon__DataDirectory')
+    $null = $start.Environment.Remove('Beacon__RegistrationsPerHour')
     $start.Environment.Add('ASPNETCORE_ENVIRONMENT', 'Production')
     $start.Environment.Add('ASPNETCORE_URLS', "http://127.0.0.1:$Port")
-    $start.Environment.Add('Compass__DataDirectory', $data)
-    $start.Environment.Add('Compass__RegistrationsPerHour', '500')
+    $start.Environment.Add('Beacon__DataDirectory', $data)
+    $start.Environment.Add('Beacon__RegistrationsPerHour', '500')
     $start.Environment.Add('Logging__EventLog__LogLevel__Default', 'None')
     return [System.Diagnostics.Process]::Start($start)
 }
 
-function Stop-CompassServer($ServerProcess) {
+function Stop-BeaconServer($ServerProcess) {
     if ($null -eq $ServerProcess -or $ServerProcess.HasExited) {
         return
     }
@@ -56,7 +56,7 @@ function Wait-ForHealth([System.Net.Http.HttpClient]$Client, [string]$BaseUrl) {
             $response = $Client.GetAsync("$BaseUrl/health").GetAwaiter().GetResult()
             if ($response.IsSuccessStatusCode) {
                 $health = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult() | ConvertFrom-Json
-                if ($health.status -eq 'ok' -and $health.protocol -eq 1) {
+                if ($health.status -eq 'ok' -and $health.protocol -eq 2) {
                     return
                 }
             }
@@ -68,13 +68,13 @@ function Wait-ForHealth([System.Net.Http.HttpClient]$Client, [string]$BaseUrl) {
         Start-Sleep -Milliseconds 250
     }
 
-    throw 'Compass did not become healthy within 15 seconds.'
+    throw 'Beacon did not become healthy within 15 seconds.'
 }
 
 try {
     New-Item -ItemType Directory -Path $scratch, $published, $data -Force | Out-Null
 
-    & dotnet publish (Join-Path $repoRoot 'src/Compass.Server/Compass.Server.csproj') `
+    & dotnet publish (Join-Path $repoRoot 'src/Beacon.Server/Beacon.Server.csproj') `
         -c Release --no-restore --no-self-contained -p:UseAppHost=false -o $published --nologo
     if ($LASTEXITCODE -ne 0) { throw 'Server publish failed.' }
 
@@ -87,7 +87,7 @@ try {
     $client = [System.Net.Http.HttpClient]::new()
     $client.Timeout = [TimeSpan]::FromSeconds(1)
 
-    $process = Start-CompassServer $port
+    $process = Start-BeaconServer $port
     Wait-ForHealth $client $baseUrl
 
     $withoutProtocol = $client.GetAsync("$baseUrl/api/beacons").GetAwaiter().GetResult()
@@ -95,7 +95,7 @@ try {
         throw "Protocol guard returned $([int]$withoutProtocol.StatusCode), expected 426."
     }
 
-    $client.DefaultRequestHeaders.Add('X-Compass-Protocol', '1')
+    $client.DefaultRequestHeaders.Add('X-Beacon-Protocol', '2')
     $registrationBody = [System.Net.Http.StringContent]::new(
         '{"displayName":"Release Smoke"}',
         [System.Text.Encoding]::UTF8,
@@ -110,14 +110,14 @@ try {
         throw 'Registration response did not contain an account id and secret key.'
     }
 
-    $client.DefaultRequestHeaders.Add('X-Compass-Key', [string]$payload.secretKey)
+    $client.DefaultRequestHeaders.Add('X-Beacon-Key', [string]$payload.secretKey)
     $me = $client.GetAsync("$baseUrl/api/accounts/me").GetAwaiter().GetResult()
     if (-not $me.IsSuccessStatusCode) {
         throw "Authenticated account lookup failed with HTTP $([int]$me.StatusCode)."
     }
 
-    Stop-CompassServer $process
-    $process = Start-CompassServer $port
+    Stop-BeaconServer $process
+    $process = Start-BeaconServer $port
     Wait-ForHealth $client $baseUrl
 
     $afterRestart = $client.GetAsync("$baseUrl/api/accounts/me").GetAwaiter().GetResult()
@@ -125,10 +125,10 @@ try {
         throw 'Account data did not survive a full server restart.'
     }
 
-    Write-Host 'Compass server contract, protocol guard, and restart persistence smoke test passed.'
+    Write-Host 'Beacon server contract, protocol guard, and restart persistence smoke test passed.'
 }
 finally {
-    Stop-CompassServer $process
+    Stop-BeaconServer $process
     if (Test-Path -LiteralPath $scratch) {
         Remove-Item -LiteralPath $scratch -Recurse -Force
     }

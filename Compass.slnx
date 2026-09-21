@@ -1,7 +1,0 @@
-<Solution>
-  <Folder Name="/src/">
-    <Project Path="src/Compass.Plugin/Compass.Plugin.csproj" />
-    <Project Path="src/Compass.Server/Compass.Server.csproj" />
-    <Project Path="src/Compass.Shared/Compass.Shared.csproj" />
-  </Folder>
-</Solution>
