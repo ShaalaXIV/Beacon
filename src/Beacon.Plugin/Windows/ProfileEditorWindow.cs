@@ -195,8 +195,6 @@ public sealed class ProfileEditorWindow : Window
 
     public override void Draw()
     {
-        screenshots.Draw();
-
         var scale = ImGuiHelpers.GlobalScale;
 
         if (!Svc.InWorld && editing is null)
@@ -309,9 +307,6 @@ public sealed class ProfileEditorWindow : Window
 
         ImGui.Dummy(new Vector2(size, size * 1.2f));
 
-        if (ImGui.Button(screenshots.Capturing ? "..." : "Capture", new Vector2(size, 0)))
-            _ = CapturePortraitAsync();
-
         if (ImGui.Button("Choose file", new Vector2(size, 0)))
         {
             screenshots.PickFile((bytes, fileName) =>
@@ -323,16 +318,6 @@ public sealed class ProfileEditorWindow : Window
 
         if (screenshots.LastError is { } error)
             Ornament.TextWrapped(Theme.Wax, error);
-    }
-
-    private async Task CapturePortraitAsync()
-    {
-        var bytes = await screenshots.CaptureAsync();
-        if (bytes is null)
-            return;
-
-        pendingPortrait = bytes;
-        pendingPortraitName = "portrait.png";
     }
 
     // --- Character -------------------------------------------------------

@@ -32,6 +32,16 @@ try {
         throw 'Plugin release metadata is incomplete.'
     }
 
+    $profileEditor = Get-Content -LiteralPath 'src/Beacon.Plugin/Windows/ProfileEditorWindow.cs' -Raw
+    if ($profileEditor -match 'CapturePortraitAsync' -or $profileEditor -match 'screenshots\.CaptureAsync\(') {
+        throw 'The profile editor must upload chosen files instead of capturing the viewport.'
+    }
+    $dialogDrawSites = @(Get-ChildItem -LiteralPath 'src/Beacon.Plugin' -Recurse -Filter '*.cs' |
+        Select-String -Pattern 'screenshots\.Draw\(\);')
+    if ($dialogDrawSites.Count -ne 1) {
+        throw "The shared file dialog must be drawn exactly once after all plugin windows; found $($dialogDrawSites.Count) draw sites."
+    }
+
     $iconPath = 'images/icon.png'
     if (-not (Test-Path -LiteralPath $iconPath)) {
         throw 'The repository is missing images/icon.png.'
