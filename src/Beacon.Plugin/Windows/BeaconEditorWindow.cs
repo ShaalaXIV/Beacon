@@ -134,8 +134,6 @@ public sealed class BeaconEditorWindow : Window
 
     public override void Draw()
     {
-        screenshots.Draw();
-
         var scale = ImGuiHelpers.GlobalScale;
 
         DrawLocation(scale);
