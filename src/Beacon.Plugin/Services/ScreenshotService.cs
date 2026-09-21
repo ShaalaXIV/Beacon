@@ -1,5 +1,7 @@
+using System.Numerics;
 using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Interface.Textures;
+using Dalamud.Interface.Textures.TextureWraps;
 using Beacon.Shared.Beacons;
 
 namespace Beacon.Services;
@@ -97,7 +99,7 @@ public sealed class ScreenshotService : IDisposable
     /// Opens a file picker for an existing screenshot. The callback runs on the UI thread with the
     /// file's bytes and name, or is not called at all if the player cancels.
     /// </summary>
-    public void PickFile(Action<byte[], string> onPicked)
+    public void PickFile(Action<byte[], string> onPicked, int maxFileBytes = BeaconLimits.MaxImageUploadBytes)
     {
         LastError = null;
 
@@ -121,9 +123,9 @@ public sealed class ScreenshotService : IDisposable
                         return;
                     }
 
-                    if (info.Length > BeaconLimits.MaxImageUploadBytes)
+                    if (info.Length > maxFileBytes)
                     {
-                        LastError = $"That file is larger than {BeaconLimits.MaxImageUploadBytes / (1024 * 1024)} MB.";
+                        LastError = $"That file is larger than {maxFileBytes / (1024 * 1024)} MB.";
                         return;
                     }
 
@@ -138,6 +140,75 @@ public sealed class ScreenshotService : IDisposable
             selectionCountMax: 1,
             startPath: DefaultScreenshotFolder(),
             isModal: true);
+    }
+
+    /// <summary>
+    /// Crops and resizes a decoded image on the GPU, then encodes the result as a PNG ready to upload.
+    /// Keeping this on Dalamud's texture path avoids shipping a second image library with the plugin.
+    /// </summary>
+    public async Task<byte[]?> CropToPngAsync(
+        IDalamudTextureWrap source,
+        Vector2 uv0,
+        Vector2 uv1,
+        int width,
+        int height,
+        CancellationToken ct = default)
+    {
+        LastError = null;
+
+        try
+        {
+            var args = new TextureModificationArgs
+            {
+                Uv0 = uv0,
+                Uv1 = uv1,
+                NewWidth = width,
+                NewHeight = height,
+            };
+
+            using var cropped = await Svc.Textures.CreateFromExistingTextureAsync(
+                source,
+                args,
+                leaveWrapOpen: true,
+                debugName: "Beacon portrait crop",
+                cancellationToken: ct);
+
+            var png = FindPngEncoder();
+            if (png is null)
+            {
+                LastError = "This machine has no PNG encoder available.";
+                return null;
+            }
+
+            using var buffer = new MemoryStream();
+            await Svc.TextureReadback.SaveToStreamAsync(
+                cropped,
+                png.Value,
+                buffer,
+                props: null,
+                leaveWrapOpen: true,
+                leaveStreamOpen: true,
+                cancellationToken: ct);
+
+            var bytes = buffer.ToArray();
+            if (bytes.Length > BeaconLimits.MaxImageUploadBytes)
+            {
+                LastError = "The cropped portrait is still too large to upload.";
+                return null;
+            }
+
+            return bytes;
+        }
+        catch (OperationCanceledException)
+        {
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Svc.Log.Warning(ex, "Beacon: portrait crop failed.");
+            LastError = "Could not crop that portrait. Try another image.";
+            return null;
+        }
     }
 
     /// <summary>

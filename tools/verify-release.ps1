@@ -36,6 +36,33 @@ try {
     if ($profileEditor -match 'CapturePortraitAsync' -or $profileEditor -match 'screenshots\.CaptureAsync\(') {
         throw 'The profile editor must upload chosen files instead of capturing the viewport.'
     }
+    foreach ($required in @(
+        'CreateFromImageAsync',
+        'CropToPngAsync',
+        'PortraitOutputWidth = 600',
+        'PortraitOutputHeight = 720',
+        'PortraitSourceMaxBytes = 25 * 1024 * 1024',
+        'draw.AddImage(texture.Handle, origin, box, uv0, uv1)'
+    )) {
+        if ($profileEditor.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+            throw "The profile preview-and-crop workflow is incomplete: $required"
+        }
+    }
+
+    $screenshotService = Get-Content -LiteralPath 'src/Beacon.Plugin/Services/ScreenshotService.cs' -Raw
+    foreach ($required in @('CreateFromExistingTextureAsync', 'Uv0 = uv0', 'Uv1 = uv1', 'NewWidth = width', 'NewHeight = height')) {
+        if ($screenshotService.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+            throw "The portrait crop encoder is incomplete: $required"
+        }
+    }
+
+    $profileService = Get-Content -LiteralPath 'src/Beacon.Plugin/Services/ProfileService.cs' -Raw
+    foreach ($required in @('previousImages', 'UpdateGalleryAsync', 'PortraitImageId = newImage.ImageId')) {
+        if ($profileService.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+            throw "Uploaded portrait replacement is incomplete: $required"
+        }
+    }
+
     $dialogDrawSites = @(Get-ChildItem -LiteralPath 'src/Beacon.Plugin' -Recurse -Filter '*.cs' |
         Select-String -Pattern 'screenshots\.Draw\(\);')
     if ($dialogDrawSites.Count -ne 1) {
