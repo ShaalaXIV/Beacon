@@ -46,10 +46,9 @@ public sealed class ProfileEditorWindow : Window, IDisposable
     private string race = string.Empty;
     private string clan = string.Empty;
     private string gender = string.Empty;
-    private string pronouns = string.Empty;
     private string quote = string.Empty;
     private readonly string[] archetype = ["", "", ""];
-    private AgeRange age = AgeRange.Unspecified;
+    private string age = string.Empty;
 
     private readonly HashSet<PersonalityTrait> traits = [];
     private readonly HashSet<RpTone> tones = [];
@@ -139,10 +138,9 @@ public sealed class ProfileEditorWindow : Window, IDisposable
             race = appearance.Race ?? string.Empty;
             clan = appearance.Clan ?? string.Empty;
             gender = appearance.Gender ?? string.Empty;
-            pronouns = string.Empty;
             quote = string.Empty;
             Array.Fill(archetype, string.Empty);
-            age = AgeRange.Unspecified;
+            age = string.Empty;
 
             length = RpLength.Casual;
             boundaries = string.Empty;
@@ -164,9 +162,8 @@ public sealed class ProfileEditorWindow : Window, IDisposable
             race = identity.Race ?? string.Empty;
             clan = identity.Clan ?? string.Empty;
             gender = identity.Gender ?? string.Empty;
-            pronouns = identity.Pronouns ?? string.Empty;
             quote = identity.Quote ?? string.Empty;
-            age = identity.Age;
+            age = identity.Age?.ToString() ?? string.Empty;
 
             for (var i = 0; i < archetype.Length; i++)
                 archetype[i] = i < identity.Archetype.Count ? identity.Archetype[i] : string.Empty;
@@ -432,24 +429,10 @@ public sealed class ProfileEditorWindow : Window, IDisposable
 
         ImGui.SetNextItemWidth(half);
         ImGui.InputTextWithHint("##gender", "Gender", ref gender, 32);
-        ImGui.SameLine(0, 8f * scale);
+
+        Ornament.PageLabel("Age");
         ImGui.SetNextItemWidth(half);
-        ImGui.InputTextWithHint("##pronouns", "Pronouns", ref pronouns, 32);
-
-        ImGui.SetNextItemWidth(half);
-        if (ImGui.BeginCombo("##age", ProfileLabels.Describe(age)))
-        {
-            foreach (var option in Enum.GetValues<AgeRange>())
-            {
-                if (ImGui.Selectable(ProfileLabels.Describe(option), age == option))
-                    age = option;
-            }
-
-            ImGui.EndCombo();
-        }
-
-        ImGui.SameLine();
-        Ornament.Text(Theme.MutedDeep, "A bracket, not a number.");
+        ImGui.InputTextWithHint("##age", "Age", ref age, 5, ImGuiInputTextFlags.CharsDecimal);
 
         ImGui.Spacing();
         Ornament.PageLabel("A line they might say");
@@ -781,6 +764,20 @@ public sealed class ProfileEditorWindow : Window, IDisposable
         var characterName = editing?.CharacterName ?? location.CurrentCharacterName;
         var worldId = editing?.WorldId ?? location.CurrentWorldId;
 
+        int? ageYears = null;
+        if (!string.IsNullOrWhiteSpace(age))
+        {
+            if (!int.TryParse(age, out var parsedAge)
+                || parsedAge < ProfileLimits.AgeMin
+                || parsedAge > ProfileLimits.AgeMax)
+            {
+                validationError = $"Age must be between {ProfileLimits.AgeMin} and {ProfileLimits.AgeMax}.";
+                return;
+            }
+
+            ageYears = parsedAge;
+        }
+
         if (string.IsNullOrWhiteSpace(characterName) || worldId == 0)
         {
             validationError = "Beacon cannot tell which character this is. Wait until you have loaded in.";
@@ -802,9 +799,8 @@ public sealed class ProfileEditorWindow : Window, IDisposable
                 Title = Blank(title),
                 Race = Blank(race),
                 Clan = Blank(clan),
-                Age = age,
+                Age = ageYears,
                 Gender = Blank(gender),
-                Pronouns = Blank(pronouns),
                 Archetype = archetype.Where(a => !string.IsNullOrWhiteSpace(a)).Select(a => a.Trim()).ToList(),
                 Quote = Blank(quote),
             },

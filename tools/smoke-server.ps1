@@ -9,6 +9,7 @@ $scratch = Join-Path ([System.IO.Path]::GetTempPath()) ("beacon-smoke-" + [guid]
 $published = Join-Path $scratch 'server'
 $data = Join-Path $scratch 'data'
 $process = $null
+$protocol = 3
 
 function Get-FreeLoopbackPort {
     $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
@@ -56,7 +57,7 @@ function Wait-ForHealth([System.Net.Http.HttpClient]$Client, [string]$BaseUrl) {
             $response = $Client.GetAsync("$BaseUrl/health").GetAwaiter().GetResult()
             if ($response.IsSuccessStatusCode) {
                 $health = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult() | ConvertFrom-Json
-                if ($health.status -eq 'ok' -and $health.protocol -eq 2) {
+                if ($health.status -eq 'ok' -and $health.protocol -eq $protocol) {
                     return
                 }
             }
@@ -95,7 +96,7 @@ try {
         throw "Protocol guard returned $([int]$withoutProtocol.StatusCode), expected 426."
     }
 
-    $client.DefaultRequestHeaders.Add('X-Beacon-Protocol', '2')
+    $client.DefaultRequestHeaders.Add('X-Beacon-Protocol', [string]$protocol)
     $registrationBody = [System.Net.Http.StringContent]::new(
         '{"displayName":"Release Smoke"}',
         [System.Text.Encoding]::UTF8,

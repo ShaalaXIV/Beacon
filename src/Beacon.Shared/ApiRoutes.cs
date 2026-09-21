@@ -16,7 +16,7 @@ public static class ApiRoutes
     public const string ProtocolHeader = "X-Beacon-Protocol";
 
     /// <summary>Bump when a change to the shared contracts is not backwards compatible.</summary>
-    public const int ProtocolVersion = 2;
+    public const int ProtocolVersion = 3;
 
     /// <summary>Liveness probe, unauthenticated. Also reports the server's protocol range.</summary>
     public const string Health = "/health";

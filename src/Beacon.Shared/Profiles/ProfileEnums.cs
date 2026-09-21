@@ -150,25 +150,6 @@ public enum AvailabilityState
 }
 
 /// <summary>
-/// Age brackets.
-///
-/// There is deliberately no bracket below adult. This is a matchmaking system whose tone tags include
-/// romance, and the pairing of a child-coded character with those tags is the single most common thing
-/// a moderator ends up having to act on. Not offering the bracket is cheaper than policing it.
-/// </summary>
-public enum AgeRange
-{
-    Unspecified = 0,
-    YoungAdult = 1,
-    Adult = 2,
-    MiddleAged = 3,
-    Elder = 4,
-
-    /// <summary>Immortal, unaging, or simply nobody's business.</summary>
-    Ageless = 5,
-}
-
-/// <summary>
 /// Gallery slots. Four, not nine.
 ///
 /// A longer list reads as a checklist of chores; people fill two and leave the rest empty, which makes

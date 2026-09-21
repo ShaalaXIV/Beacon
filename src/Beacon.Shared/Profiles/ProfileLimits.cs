@@ -13,6 +13,9 @@ public static class ProfileLimits
     /// <summary>The epithet under the name. "The Wolf Without a Den".</summary>
     public const int TitleMaxLength = 60;
 
+    public const int AgeMin = 18;
+    public const int AgeMax = 9999;
+
     /// <summary>The one line in quotes on the card.</summary>
     public const int QuoteMaxLength = 160;
 

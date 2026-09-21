@@ -4,7 +4,7 @@
     <!-- Drives the built DLL, the generated manifest, and the folder Dalamud loads it from. -->
     <AssemblyName>Beacon</AssemblyName>
     <RootNamespace>Beacon</RootNamespace>
-    <Version>0.1.6.0</Version>
+    <Version>0.1.7.0</Version>
     <!-- The Dalamud SDK does not turn these on, and every service file wants System.Threading.Tasks. -->
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>

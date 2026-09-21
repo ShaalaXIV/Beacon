@@ -718,7 +718,6 @@ public sealed class ProfileService(
         profile.Clan = NullIfEmpty(Validation.CleanLine(identity.Clan));
         profile.Age = identity.Age;
         profile.Gender = NullIfEmpty(Validation.CleanLine(identity.Gender));
-        profile.Pronouns = NullIfEmpty(Validation.CleanLine(identity.Pronouns));
         profile.ArchetypeCsv = ProfileMapper.JoinArchetype(identity.Archetype);
         profile.Quote = NullIfEmpty(Validation.CleanLine(identity.Quote));
 
@@ -772,6 +771,9 @@ public sealed class ProfileService(
 
         if (name.Length > ProfileLimits.NameMaxLength)
             return $"A character name cannot exceed {ProfileLimits.NameMaxLength} characters.";
+
+        if (request.Identity.Age is { } age && (age < ProfileLimits.AgeMin || age > ProfileLimits.AgeMax))
+            return $"Age must be between {ProfileLimits.AgeMin} and {ProfileLimits.AgeMax}.";
 
         if ((request.Overview?.Length ?? 0) > ProfileLimits.OverviewMaxLength)
             return $"The overview cannot exceed {ProfileLimits.OverviewMaxLength} characters.";

@@ -167,7 +167,6 @@ public class BeaconDbContext(DbContextOptions<BeaconDbContext> options) : DbCont
             e.Property(x => x.Race).HasMaxLength(32);
             e.Property(x => x.Clan).HasMaxLength(32);
             e.Property(x => x.Gender).HasMaxLength(32);
-            e.Property(x => x.Pronouns).HasMaxLength(32);
             e.Property(x => x.ArchetypeCsv).HasMaxLength(96);
             e.Property(x => x.Quote).HasMaxLength(200);
             e.Property(x => x.Boundaries).HasMaxLength(256);

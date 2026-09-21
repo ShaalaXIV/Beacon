@@ -91,7 +91,6 @@ public static class ProfileMapper
                 Clan = e.Clan,
                 Age = e.Age,
                 Gender = e.Gender,
-                Pronouns = e.Pronouns,
                 Archetype = SplitArchetype(e.ArchetypeCsv),
                 Quote = e.Quote,
             },

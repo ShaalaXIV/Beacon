@@ -15,11 +15,10 @@ public sealed record ProfileIdentity
 
     public string? Clan { get; init; }
 
-    public AgeRange Age { get; init; }
+    /// <summary>Optional exact character age in years.</summary>
+    public int? Age { get; init; }
 
     public string? Gender { get; init; }
-
-    public string? Pronouns { get; init; }
 
     /// <summary>The three words that set the tone before anybody reads a word of prose.</summary>
     public IReadOnlyList<string> Archetype { get; init; } = [];
