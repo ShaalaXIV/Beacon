@@ -36,6 +36,28 @@ try {
     if ($profileEditor -match 'CapturePortraitAsync' -or $profileEditor -match 'screenshots\.CaptureAsync\(') {
         throw 'The profile editor must upload chosen files instead of capturing the viewport.'
     }
+    if ($profileEditor -match 'pronouns' -or $profileEditor -match 'Age range' -or $profileEditor -match 'A bracket, not a number') {
+        throw 'Removed profile fields or cryptic age guidance have returned to the editor.'
+    }
+
+    $profileContract = Get-Content -LiteralPath 'src/Beacon.Shared/Profiles/ProfileDto.cs' -Raw
+    if ($profileContract -notmatch 'int\?\s+Age' -or $profileContract -match 'Pronouns') {
+        throw 'The profile contract must use an optional exact age and must not expose pronouns.'
+    }
+    $profileLimits = Get-Content -LiteralPath 'src/Beacon.Shared/Profiles/ProfileLimits.cs' -Raw
+    if ($profileLimits -notmatch 'AgeMin\s*=\s*18' -or $profileLimits -notmatch 'AgeMax\s*=\s*9999') {
+        throw 'The exact-age safety bounds are missing.'
+    }
+    $ageSchemaMigration = Get-Content -LiteralPath 'src/Beacon.Server/Data/Migrations/20260921205722_ExactProfileAgeAndRemovePronouns.cs' -Raw
+    foreach ($required in @('DropColumn(', 'name: "Pronouns"', 'nullable: true')) {
+        if ($ageSchemaMigration.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+            throw "The exact-age migration is incomplete: $required"
+        }
+    }
+    $ageDataMigration = Get-Content -LiteralPath 'src/Beacon.Server/Data/Migrations/20260921210236_ClearLegacyAgeCategories.cs' -Raw
+    if ($ageDataMigration -notmatch 'SET.+Age.+NULL') {
+        throw 'The legacy age-category cleanup migration is missing.'
+    }
     foreach ($required in @(
         'CreateFromImageAsync',
         'CropToPngAsync',

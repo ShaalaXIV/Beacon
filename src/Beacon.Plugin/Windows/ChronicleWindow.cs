@@ -433,11 +433,8 @@ public sealed class ChronicleWindow : Window
         if (!string.IsNullOrWhiteSpace(profile.Identity.Lineage))
             details.Add(profile.Identity.Lineage);
 
-        if (profile.Identity.Age != AgeRange.Unspecified)
-            details.Add(ProfileLabels.Describe(profile.Identity.Age));
-
-        if (!string.IsNullOrWhiteSpace(profile.Identity.Pronouns))
-            details.Add(profile.Identity.Pronouns!);
+        if (profile.Identity.Age is { } age)
+            details.Add($"Age {age}");
 
         if (details.Count > 0)
             Ornament.Text(Theme.InkSoft, string.Join("  ·  ", details));

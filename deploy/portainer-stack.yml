@@ -1,6 +1,6 @@
 services:
   beacon-server:
-    image: beacon-server:0.1.2
+    image: beacon-server:0.1.7
     restart: always
     environment:
       ASPNETCORE_ENVIRONMENT: Production
@@ -59,7 +59,7 @@ services:
       /bin/sh -c '(while sleep 86400; do nginx -s reload; done) & exec nginx -g "daemon off;"'
 
   beacon-backup:
-    image: beacon-backup:0.1.2
+    image: beacon-backup:0.1.7
     restart: always
     environment:
       BACKUP_INTERVAL_SECONDS: "86400"

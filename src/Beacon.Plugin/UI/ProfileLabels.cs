@@ -102,16 +102,6 @@ public static class ProfileLabels
             + "Plenty of people want this and want nothing to do with the explicit tag.",
     };
 
-    public static string Describe(AgeRange age) => age switch
-    {
-        AgeRange.YoungAdult => "Young adult",
-        AgeRange.Adult => "Adult",
-        AgeRange.MiddleAged => "Middle-aged",
-        AgeRange.Elder => "Elder",
-        AgeRange.Ageless => "Ageless",
-        _ => "Unsaid",
-    };
-
     public static string Describe(GalleryCategory category) => category switch
     {
         GalleryCategory.FullBody => "Full body",

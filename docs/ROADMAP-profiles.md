@@ -45,7 +45,7 @@ that makes the addition cheap.
 ```
 ProfileEntity
   Id, AccountId, CharacterName, WorldId
-  DisplayName, Pronouns, Age, Race, Occupation
+  DisplayName, Age, Race, Occupation
   Appearance, Personality, Background   (long text)
   Hooks                                 (short "what you could approach me about" lines)
   PortraitImageId  -> reuses BeaconImageEntity's storage

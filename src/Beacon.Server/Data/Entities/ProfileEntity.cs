@@ -37,11 +37,9 @@ public class ProfileEntity
 
     public string? Clan { get; set; }
 
-    public AgeRange Age { get; set; }
+    public int? Age { get; set; }
 
     public string? Gender { get; set; }
-
-    public string? Pronouns { get; set; }
 
     /// <summary>The three archetype words, pipe-delimited. Not searched, so no join table needed.</summary>
     public string ArchetypeCsv { get; set; } = string.Empty;
