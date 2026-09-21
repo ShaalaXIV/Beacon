@@ -36,15 +36,15 @@ try {
     if (-not (Test-Path -LiteralPath $iconPath)) {
         throw 'The repository is missing images/icon.png.'
     }
-    Add-Type -AssemblyName System.Drawing
-    $icon = [System.Drawing.Image]::FromFile((Resolve-Path -LiteralPath $iconPath).Path)
-    try {
-        if ($icon.Width -ne $icon.Height -or $icon.Width -lt 64 -or $icon.Width -gt 512) {
-            throw "The Dalamud icon must be square and between 64x64 and 512x512; found $($icon.Width)x$($icon.Height)."
-        }
+    $iconBytes = [System.IO.File]::ReadAllBytes((Resolve-Path -LiteralPath $iconPath).Path)
+    $pngSignature = [byte[]](0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)
+    if ($iconBytes.Length -lt 24 -or (Compare-Object $pngSignature $iconBytes[0..7]).Count -ne 0) {
+        throw 'The Dalamud icon must be a valid PNG file.'
     }
-    finally {
-        $icon.Dispose()
+    $iconWidth = [uint32]($iconBytes[16] * 16777216 + $iconBytes[17] * 65536 + $iconBytes[18] * 256 + $iconBytes[19])
+    $iconHeight = [uint32]($iconBytes[20] * 16777216 + $iconBytes[21] * 65536 + $iconBytes[22] * 256 + $iconBytes[23])
+    if ($iconWidth -ne $iconHeight -or $iconWidth -lt 64 -or $iconWidth -gt 512) {
+        throw "The Dalamud icon must be square and between 64x64 and 512x512; found ${iconWidth}x${iconHeight}."
     }
 
     $stack = Get-Content -LiteralPath 'deploy/portainer-stack.yml' -Raw
