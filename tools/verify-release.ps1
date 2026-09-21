@@ -32,6 +32,22 @@ try {
         throw 'Plugin release metadata is incomplete.'
     }
 
+    $iconPath = 'images/icon.png'
+    if (-not (Test-Path -LiteralPath $iconPath)) {
+        throw 'The repository is missing images/icon.png.'
+    }
+    $iconBytes = [System.IO.File]::ReadAllBytes((Resolve-Path -LiteralPath $iconPath).Path)
+    $pngSignature = [byte[]](0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)
+    $signatureDifference = @(Compare-Object $pngSignature $iconBytes[0..7])
+    if ($iconBytes.Length -lt 24 -or $signatureDifference.Count -ne 0) {
+        throw 'The Dalamud icon must be a valid PNG file.'
+    }
+    $iconWidth = [uint32]($iconBytes[16] * 16777216 + $iconBytes[17] * 65536 + $iconBytes[18] * 256 + $iconBytes[19])
+    $iconHeight = [uint32]($iconBytes[20] * 16777216 + $iconBytes[21] * 65536 + $iconBytes[22] * 256 + $iconBytes[23])
+    if ($iconWidth -ne $iconHeight -or $iconWidth -lt 64 -or $iconWidth -gt 512) {
+        throw "The Dalamud icon must be square and between 64x64 and 512x512; found ${iconWidth}x${iconHeight}."
+    }
+
     $stack = Get-Content -LiteralPath 'deploy/portainer-stack.yml' -Raw
     foreach ($required in @(
         'restart: always',
@@ -85,7 +101,7 @@ try {
         if ($manifest.RepoUrl -ne 'https://github.com/ShaalaXIV/Beacon') {
             throw 'Generated manifest has the wrong repository URL.'
         }
-        if ($manifest.IconUrl -ne 'https://plugins.aethercast.org/images/beacon.png') {
+        if ($manifest.IconUrl -ne 'https://plugins.aethercast.org/images/beacon-icon.png') {
             throw 'Generated manifest has the wrong icon URL.'
         }
 
