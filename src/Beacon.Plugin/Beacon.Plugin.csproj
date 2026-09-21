@@ -4,7 +4,7 @@
     <!-- Drives the built DLL, the generated manifest, and the folder Dalamud loads it from. -->
     <AssemblyName>Beacon</AssemblyName>
     <RootNamespace>Beacon</RootNamespace>
-    <Version>0.1.3.0</Version>
+    <Version>0.1.4.0</Version>
     <!-- The Dalamud SDK does not turn these on, and every service file wants System.Threading.Tasks. -->
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
@@ -19,7 +19,7 @@
     <CategoryTags>other</CategoryTags>
     <ApplicableVersion>any</ApplicableVersion>
     <AcceptsFeedback>true</AcceptsFeedback>
-    <IconUrl>https://plugins.aethercast.org/images/beacon.png</IconUrl>
+    <IconUrl>https://plugins.aethercast.org/images/beacon-icon.png</IconUrl>
     <RepoUrl>https://github.com/ShaalaXIV/Beacon</RepoUrl>
   </PropertyGroup>
 
