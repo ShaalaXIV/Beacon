@@ -38,7 +38,8 @@ try {
     }
     $iconBytes = [System.IO.File]::ReadAllBytes((Resolve-Path -LiteralPath $iconPath).Path)
     $pngSignature = [byte[]](0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)
-    if ($iconBytes.Length -lt 24 -or (Compare-Object $pngSignature $iconBytes[0..7]).Count -ne 0) {
+    $signatureDifference = @(Compare-Object $pngSignature $iconBytes[0..7])
+    if ($iconBytes.Length -lt 24 -or $signatureDifference.Count -ne 0) {
         throw 'The Dalamud icon must be a valid PNG file.'
     }
     $iconWidth = [uint32]($iconBytes[16] * 16777216 + $iconBytes[17] * 65536 + $iconBytes[18] * 256 + $iconBytes[19])
