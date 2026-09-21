@@ -19,17 +19,17 @@ jobs:
           global-json-file: global.json
           cache: true
           cache-dependency-path: |
-            src/Compass.Server/packages.lock.json
-            src/Compass.Shared/packages.lock.json
+            src/Beacon.Server/packages.lock.json
+            src/Beacon.Shared/packages.lock.json
       - name: Check release invariants
         shell: pwsh
         run: ./tools/verify-release.ps1 -SkipBuild -AllowDirty
       - name: Restore locked server dependencies
-        run: dotnet restore src/Compass.Server/Compass.Server.csproj --locked-mode
+        run: dotnet restore src/Beacon.Server/Beacon.Server.csproj --locked-mode
       - name: Build server
-        run: dotnet build src/Compass.Server/Compass.Server.csproj -c Release --no-restore --nologo
+        run: dotnet build src/Beacon.Server/Beacon.Server.csproj -c Release --no-restore --nologo
       - name: Exercise API contract and persistence
         shell: pwsh
         run: ./tools/smoke-server.ps1
       - name: Build production container
-        run: docker build --tag compass-server:ci .
+        run: docker build --tag beacon-server:ci .

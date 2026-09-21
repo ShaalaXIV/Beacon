@@ -1,4 +1,4 @@
-# Compass
+# Beacon
 
 **Find the fires. Light your own.**
 
@@ -9,7 +9,7 @@ Venue plugins already solve the venue problem: a fixed address in a ward, open o
 not solve the other half of roleplay, which happens at a camp in Il Mheg, a shrine in Thavnair, a
 crossroads in the Shroud — places with no plot number and no way to tell anyone they exist.
 
-Compass gives those places an address, a picture, a description, and a flame you light when you are
+Beacon gives those places an address, a picture, a description, and a flame you light when you are
 actually there.
 
 ---
@@ -19,7 +19,7 @@ actually there.
 **Raise a beacon** anywhere you can stand. The plugin captures your exact position, zone, world and
 nearest aetheryte, and you add a name, a description, a screenshot and some tags.
 
-**Travel to one** from anywhere, across worlds and data centres. Compass plans the route and drives
+**Travel to one** from anywhere, across worlds and data centres. Beacon plans the route and drives
 it: world visit or DC transfer via Lifestream, teleport to the nearest aetheryte, then walks the last
 stretch with vnavmesh if you have it. An on-screen arrow points the rest of the way.
 
@@ -36,9 +36,9 @@ Lighting is enforced **server-side**: you must be on the right world, in the rig
 
 | Project | What it is |
 |---|---|
-| `src/Compass.Shared` | DTOs, routes and limits shared by both ends. One source of truth for the wire contract. |
-| `src/Compass.Server` | ASP.NET Core 10 + EF Core + SQLite. The atlas, the image store, the realtime hub. |
-| `src/Compass.Plugin` | The Dalamud plugin. Builds to `Compass.dll`. |
+| `src/Beacon.Shared` | DTOs, routes and limits shared by both ends. One source of truth for the wire contract. |
+| `src/Beacon.Server` | ASP.NET Core 10 + EF Core + SQLite. The atlas, the image store, the realtime hub. |
+| `src/Beacon.Plugin` | The Dalamud plugin. Builds to `Beacon.dll`. |
 
 Targets .NET 10, Dalamud API level 15.
 
@@ -52,17 +52,17 @@ closing it stops the server.
 Or from a terminal:
 
 ```bash
-dotnet run --project src/Compass.Server
+dotnet run --project src/Beacon.Server
 ```
 
-It listens on `http://localhost:5215`, creates `src/Compass.Server/var/` on first run, and applies
-its migrations automatically. That directory holds `compass.db` and every uploaded screenshot —
+It listens on `http://localhost:5215`, creates `src/Beacon.Server/var/` on first run, and applies
+its migrations automatically. That directory holds `beacon.db` and every uploaded screenshot —
 **back up that one directory and you have backed up the whole service.**
 
 (It is called `var/`, not `data/`, because Windows paths are case-insensitive: a runtime `data/`
 folder beside the source `Data/` folder would be the same directory.)
 
-Configuration lives under the `Compass` section of `appsettings.json`:
+Configuration lives under the `Beacon` section of `appsettings.json`:
 
 | Setting | Default | What it does |
 |---|---|---|
@@ -89,7 +89,7 @@ Migrations are checked in and applied on startup. To add to them:
 
 ```bash
 dotnet tool restore
-dotnet dotnet-ef migrations add YourChange --project src/Compass.Server --output-dir Data/Migrations
+dotnet dotnet-ef migrations add YourChange --project src/Beacon.Server --output-dir Data/Migrations
 ```
 
 ---
@@ -97,18 +97,18 @@ dotnet dotnet-ef migrations add YourChange --project src/Compass.Server --output
 ## Building the plugin
 
 ```bash
-dotnet build src/Compass.Plugin -c Release
+dotnet build src/Beacon.Plugin -c Release
 ```
 
-Output lands in `src/Compass.Plugin/bin/Release/`, including the generated `Compass.json` manifest.
+Output lands in `src/Beacon.Plugin/bin/Release/`, including the generated `Beacon.json` manifest.
 
 To install it straight into Dalamud's dev plugin folder:
 
 ```bash
-dotnet build src/Compass.Plugin -p:DeployToDevPlugins=true
+dotnet build src/Beacon.Plugin -p:DeployToDevPlugins=true
 ```
 
-That copies to `%AppData%\XIVLauncher\devPlugins\Compass\`. It is opt-in because a build should not
+That copies to `%AppData%\XIVLauncher\devPlugins\Beacon\`. It is opt-in because a build should not
 write outside the repo unless you asked it to.
 
 ---
@@ -117,7 +117,7 @@ write outside the repo unless you asked it to.
 
 | Plugin | Required? | Why |
 |---|---|---|
-| [Lifestream](https://github.com/NightmareXIV/Lifestream) | **Yes**, for travel | World visits, DC transfers, aetheryte teleports. Compass does not reimplement any of it. |
+| [Lifestream](https://github.com/NightmareXIV/Lifestream) | **Yes**, for travel | World visits, DC transfers, aetheryte teleports. Beacon does not reimplement any of it. |
 | [vnavmesh](https://github.com/awgil/ffxiv_navmesh) | Optional | Walks the last stretch from the aetheryte to the beacon. Without it you arrive at the aetheryte and the overlay points the way. |
 
 Everything else (browsing, lighting, screenshots) works with neither installed.
@@ -128,12 +128,12 @@ Everything else (browsing, lighting, screenshots) works with neither installed.
 
 | Command | What it does |
 |---|---|
-| `/compass` | Open the atlas. |
-| `/compass here` | Raise a beacon where you stand. |
-| `/compass light` | Light the nearest beacon you may light. |
-| `/compass out` | Put out the beacon you lit. |
-| `/compass go <code>` | Open a beacon by its share code. |
-| `/compass settings` | Open the settings. |
+| `/beacon` | Open the atlas. |
+| `/beacon here` | Raise a beacon where you stand. |
+| `/beacon light` | Light the nearest beacon you may light. |
+| `/beacon out` | Put out the beacon you lit. |
+| `/beacon go <code>` | Open a beacon by its share code. |
+| `/beacon settings` | Open the settings. |
 
 ---
 
@@ -185,8 +185,8 @@ checks that no database or uploaded images are tracked, exercises the API and pr
 the server against the same temporary database, and validates the final plugin ZIP. The exact release
 order and rollback procedure are in [docs/RELEASING.md](docs/RELEASING.md).
 
-To install Compass, add `https://plugins.aethercast.org/` under Dalamud's custom plugin repositories,
-then install **Compass** from the plugin installer.
+To install Beacon, add `https://plugins.aethercast.org/` under Dalamud's custom plugin repositories,
+then install **Beacon** from the plugin installer.
 
 ---
 

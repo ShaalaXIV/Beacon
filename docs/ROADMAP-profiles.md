@@ -1,6 +1,6 @@
 # Roadmap: roleplay profiles
 
-Compass was built with profiles in mind. This describes what is already in place for them, and what
+Beacon was built with profiles in mind. This describes what is already in place for them, and what
 is left to build — so that adding profiles is an additive change rather than a refactor.
 
 ## Why the account model exists

@@ -12,5 +12,5 @@ var
 **/var
 **/*.user
 **/*.suo
-src/Compass.Plugin
-src/Compass.Server/appsettings.Development.json
+src/Beacon.Plugin
+src/Beacon.Server/appsettings.Development.json
