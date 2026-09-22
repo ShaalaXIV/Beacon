@@ -199,3 +199,20 @@ public enum ProfileSort
     Newest = 2,
     Name = 3,
 }
+
+/// <summary>
+/// Whether the player behind a character is playing them right now.
+///
+/// Borrowed from the addon culture that has had this for years: the difference between "I am in
+/// character, approach me as one" and "I am here but out of character" is the single most useful
+/// thing a card can say, and it is the one thing a static profile cannot express.
+/// </summary>
+public enum RpStance
+{
+    /// <summary>Not said either way. The honest default, and what every existing card has.</summary>
+    Unstated = 0,
+
+    InCharacter = 1,
+
+    OutOfCharacter = 2,
+}

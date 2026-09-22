@@ -1,8 +1,10 @@
 using System.Numerics;
+using Beacon.UI;
 using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Interface.Textures;
 using Dalamud.Interface.Textures.TextureWraps;
 using Beacon.Shared.Beacons;
+using FFXIVClientStructs.FFXIV.Client.UI;
 
 namespace Beacon.Services;
 
@@ -13,7 +15,7 @@ namespace Beacon.Services;
 /// Both matter. The capture button is what makes posting a beacon a ten-second job; the file picker
 /// is what lets somebody who cares about their screenshots post the good one.
 /// </summary>
-public sealed class ScreenshotService : IDisposable
+public sealed class ScreenshotService(Configuration config) : IDisposable
 {
     private readonly FileDialogManager dialogs = new();
 
@@ -40,14 +42,41 @@ public sealed class ScreenshotService : IDisposable
         Capturing = true;
         LastError = null;
 
+        var hidHud = false;
+
         try
         {
+            if (Viewport.MainId is 0)
+            {
+                // Capture can be triggered from a command before a single frame has been drawn.
+                LastError = "Open a Beacon window once before taking a photograph.";
+                return null;
+            }
+
+            if (config.HideHudForPhoto)
+                hidHud = await Svc.Framework.RunOnFrameworkThread(() => Hud.Set(false));
+
+            // The HUD fades rather than vanishing, so a frame grabbed immediately still contains it.
+            if (config.PhotoSettleMs > 0)
+                await Svc.Framework.RunOnTick(
+                    () => true,
+                    TimeSpan.FromMilliseconds(Math.Clamp(config.PhotoSettleMs, 0, 3000)),
+                    cancellationToken: ct);
+
             var args = new ImGuiViewportTextureArgs
             {
+                // Without this the call has no viewport to read: the main viewport's id is a hash,
+                // not zero, and it can only be read from inside a draw callback.
+                ViewportId = Viewport.MainId,
+
                 // Grab the frame before ImGui draws, so the atlas window is not in the picture.
                 TakeBeforeImGuiRender = true,
                 KeepTransparency = false,
                 AutoUpdate = false,
+
+                // The whole screen. Left at their defaults these describe an empty rectangle.
+                Uv0 = Vector2.Zero,
+                Uv1 = Vector2.One,
             };
 
             using var texture = await Svc.Textures.CreateFromImGuiViewportAsync(args, "Beacon capture", ct);
@@ -91,6 +120,9 @@ public sealed class ScreenshotService : IDisposable
         }
         finally
         {
+            if (hidHud)
+                await Svc.Framework.RunOnFrameworkThread(() => Hud.Set(true));
+
             Capturing = false;
         }
     }
@@ -255,4 +287,29 @@ public sealed class ScreenshotService : IDisposable
     }
 
     public void Dispose() => dialogs.Reset();
+}
+
+/// <summary>
+/// Showing and hiding the game's interface needs a pointer, which cannot live in a class that awaits.
+/// </summary>
+internal static unsafe class Hud
+{
+    /// <summary>Show or hide the game's interface. Returns whether this call actually changed it.</summary>
+    public static bool Set(bool visible)
+    {
+        try
+        {
+            var module = RaptureAtkModule.Instance();
+            if (module is null || module->IsUiVisible == visible)
+                return false;
+
+            module->SetUiVisibility(visible);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Svc.Log.Warning(ex, "Beacon: could not toggle the game interface.");
+            return false;
+        }
+    }
 }

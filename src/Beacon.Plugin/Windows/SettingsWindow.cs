@@ -21,6 +21,8 @@ public sealed class SettingsWindow : Window
 
     private readonly TravelService travel;
 
+    private readonly StageDressing stages;
+
     private string serverUrl;
 
     private string displayName;
@@ -40,7 +42,8 @@ public sealed class SettingsWindow : Window
         BeaconApi api,
         AtlasService atlas,
         BeaconHubClient hub,
-        TravelService travel)
+        TravelService travel,
+        StageDressing stages)
         : base("Beacon settings###BeaconSettings")
     {
         this.config = config;
@@ -48,6 +51,7 @@ public sealed class SettingsWindow : Window
         this.atlas = atlas;
         this.hub = hub;
         this.travel = travel;
+        this.stages = stages;
 
         serverUrl = config.ServerUrl;
         displayName = config.DisplayName;
@@ -374,6 +378,31 @@ public sealed class SettingsWindow : Window
 
         Ornament.FleuronDivider(Theme.BrassDim);
 
+        Ornament.Text(Theme.BrassBright, "Stages");
+
+        Toggle("Load every stage automatically when I arrive",
+            () => config.AutoLoadStages, v => config.AutoLoadStages = v,
+            "Off by default. A stage is another player's scenery appearing on your screen, so Beacon\n"
+            + "asks the first time and remembers your answer for that beacon. Turn this on if you would\n"
+            + "rather see every place as its keeper built it.\n"
+            + "Nothing is ever written into your own Stagehand library either way.");
+
+        if (config.TrustedStageBeacons.Count > 0 || config.RefusedStageBeacons.Count > 0)
+        {
+            Ornament.Text(
+                Theme.MutedDeep,
+                $"{config.TrustedStageBeacons.Count} agreed to, {config.RefusedStageBeacons.Count} declined.");
+
+            if (ImGui.Button("Ask me about all of them again"))
+            {
+                config.TrustedStageBeacons.Clear();
+                config.RefusedStageBeacons.Clear();
+                config.Save();
+            }
+        }
+
+        Ornament.FleuronDivider(Theme.BrassDim);
+
         Ornament.Text(Theme.BrassBright, "Appearance");
 
         Toggle("Use the Beacon parchment styling",
@@ -406,6 +435,9 @@ public sealed class SettingsWindow : Window
 
         DrawDependency("vnavmesh", travel.NavmeshAvailable,
             "Optional. Walks the last stretch from the aetheryte to the beacon itself.");
+
+        DrawDependency("Stagehand", stages.Available,
+            "Optional. Lets you see a place dressed the way its keeper built it, and share your own.");
 
         Ornament.FleuronDivider(Theme.BrassDim);
 

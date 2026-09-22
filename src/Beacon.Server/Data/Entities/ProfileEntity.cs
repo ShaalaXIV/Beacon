@@ -64,6 +64,23 @@ public class ProfileEntity
 
     public string? PlayerContact { get; set; }
 
+    // --- Today ----------------------------------------------------------
+
+    /// <summary>The live line: what this character is doing right now, in their own voice.</summary>
+    public string? Currently { get; set; }
+
+    /// <summary>The player speaking as themselves rather than as the character.</summary>
+    public string? OutOfCharacter { get; set; }
+
+    /// <summary>Whether the player is in character right now.</summary>
+    public RpStance Stance { get; set; }
+
+    /// <summary>
+    /// When the live line was last written. Separate from <see cref="UpdatedAt"/> so that editing a
+    /// biography does not make a stale "currently" look freshly written.
+    /// </summary>
+    public DateTimeOffset? CurrentlyUpdatedAt { get; set; }
+
     // --- Prose -----------------------------------------------------------
 
     public string? Overview { get; set; }
@@ -100,6 +117,8 @@ public class ProfileEntity
     public List<ProfileTagEntity> Tags { get; set; } = [];
 
     public List<ProfileHookEntity> Hooks { get; set; } = [];
+
+    public List<ProfileGlanceEntity> Glances { get; set; } = [];
 
     public List<ProfileImageEntity> Images { get; set; } = [];
 }

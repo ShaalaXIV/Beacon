@@ -60,6 +60,14 @@ public sealed class ProfileEditorWindow : Window, IDisposable
     private readonly HashSet<MatureTheme> matureThemes = [];
 
     private readonly List<string> hooks = [];
+
+    /// <summary>The "at first glance" slots, as label and line pairs.</summary>
+    private readonly List<(string Label, string Text)> glances = [];
+
+    private string outOfCharacter = string.Empty;
+    private string currently = string.Empty;
+    private RpStance stance = RpStance.Unstated;
+
     private string overview = string.Empty;
     private string history = string.Empty;
     private string goals = string.Empty;
@@ -128,6 +136,7 @@ public sealed class ProfileEditorWindow : Window, IDisposable
         activities.Clear();
         matureThemes.Clear();
         hooks.Clear();
+        glances.Clear();
 
         if (profile is null)
         {
@@ -147,6 +156,9 @@ public sealed class ProfileEditorWindow : Window, IDisposable
             walkups = true;
 
             overview = history = goals = string.Empty;
+            outOfCharacter = string.Empty;
+            currently = string.Empty;
+            stance = RpStance.Unstated;
             timezone = playtimes = contact = string.Empty;
             visibility = ProfileVisibility.Public;
             availability = AvailabilityOverride.Derived;
@@ -185,6 +197,10 @@ public sealed class ProfileEditorWindow : Window, IDisposable
                 matureThemes.Add(theme);
 
             hooks.AddRange(profile.Hooks.Select(h => h.Text));
+            glances.AddRange(profile.AtFirstGlance.Select(g => (g.Label, g.Text)));
+            outOfCharacter = profile.Moment.OutOfCharacter ?? string.Empty;
+            currently = profile.Moment.Currently ?? string.Empty;
+            stance = profile.Moment.Stance;
             overview = profile.Overview ?? string.Empty;
             history = profile.History ?? string.Empty;
             goals = profile.Goals ?? string.Empty;
@@ -235,6 +251,12 @@ public sealed class ProfileEditorWindow : Window, IDisposable
                 ImGui.EndTabItem();
             }
 
+            if (ImGui.BeginTabItem("Right now"))
+            {
+                DrawRightNow(scale);
+                ImGui.EndTabItem();
+            }
+
             if (ImGui.BeginTabItem("The player"))
             {
                 DrawPlayer(scale);
@@ -260,11 +282,11 @@ public sealed class ProfileEditorWindow : Window, IDisposable
 
         Ornament.PageLabel("Their name, as you want it written");
         ImGui.SetNextItemWidth(-1);
-        ImGui.InputTextWithHint("##name", "Shaala Avarr", ref name, ProfileLimits.NameMaxLength);
+        ImGui.InputTextWithHint("##name", "Their name", ref name, ProfileLimits.NameMaxLength);
 
         Ornament.PageLabel("An epithet, if they have one");
         ImGui.SetNextItemWidth(-1);
-        ImGui.InputTextWithHint("##title", "The Wolf Without a Den", ref title, ProfileLimits.TitleMaxLength);
+        ImGui.InputTextWithHint("##title", "An epithet", ref title, ProfileLimits.TitleMaxLength);
 
         Ornament.PageLabel("Three words");
         var third = (ImGui.GetContentRegionAvail().X - (8f * scale)) / 3f;
@@ -274,9 +296,9 @@ public sealed class ProfileEditorWindow : Window, IDisposable
             ImGui.SetNextItemWidth(third);
             ImGui.InputTextWithHint($"##arch{i}", i switch
             {
-                0 => "Wild",
-                1 => "Wanderer",
-                _ => "Independent",
+                0 => "First word",
+                1 => "Second",
+                _ => "Third",
             }, ref archetype[i], ProfileLimits.ArchetypeWordMaxLength);
 
             if (i < archetype.Length - 1)
@@ -437,7 +459,43 @@ public sealed class ProfileEditorWindow : Window, IDisposable
         ImGui.Spacing();
         Ornament.PageLabel("A line they might say");
         ImGui.SetNextItemWidth(-1);
-        ImGui.InputTextWithHint("##quote", "Between instinct and civilisation.", ref quote, ProfileLimits.QuoteMaxLength);
+        ImGui.InputTextWithHint("##quote", "A line in their own voice", ref quote, ProfileLimits.QuoteMaxLength);
+
+        Ornament.FleuronDivider(Theme.BrassDim);
+
+        Ornament.FleuronDivider(Theme.BrassDim);
+
+        Ornament.Text(Theme.BrassBright, $"At first glance  ({glances.Count} of {ProfileLimits.MaxGlanceNotes})");
+        Ornament.TextWrapped(Theme.MutedDeep,
+            "What somebody notices before a word is exchanged. A label and a line: \"Hands\" / \"Ink to the\n"
+            + "knuckles, badly done\". Leave the label blank if the line speaks for itself.");
+
+        var labelWidth = 130f * scale;
+
+        for (var i = 0; i < glances.Count; i++)
+        {
+            var (label, text) = glances[i];
+
+            ImGui.SetNextItemWidth(labelWidth);
+            if (ImGui.InputTextWithHint($"##glanceLabel{i}", "Label", ref label, ProfileLimits.GlanceLabelMaxLength))
+                glances[i] = (label, text);
+
+            ImGui.SameLine(0, 6f * scale);
+
+            ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X - (32f * scale));
+            if (ImGui.InputTextWithHint($"##glanceText{i}", "What they notice", ref text, ProfileLimits.GlanceTextMaxLength))
+                glances[i] = (label, text);
+
+            ImGui.SameLine();
+            if (ImGui.SmallButton($"x##delglance{i}"))
+            {
+                glances.RemoveAt(i);
+                break;
+            }
+        }
+
+        if (glances.Count < ProfileLimits.MaxGlanceNotes && ImGui.Button("Add an impression"))
+            glances.Add((string.Empty, string.Empty));
 
         Ornament.FleuronDivider(Theme.BrassDim);
 
@@ -530,7 +588,7 @@ public sealed class ProfileEditorWindow : Window, IDisposable
         Ornament.Text(Theme.MutedDeep, "Shown on the face of your card, where it prevents trouble.");
 
         ImGui.SetNextItemWidth(-1);
-        ImGui.InputTextWithHint("##boundaries", "No romance. Ask before injury.", ref boundaries, ProfileLimits.BoundariesMaxLength);
+        ImGui.InputTextWithHint("##boundaries", "What you would rather not play", ref boundaries, ProfileLimits.BoundariesMaxLength);
     }
 
     /// <summary>
@@ -615,6 +673,91 @@ public sealed class ProfileEditorWindow : Window, IDisposable
 
         Ornament.PageLabel("History, for anyone who asks");
         ImGui.InputTextMultiline("##history", ref history, ProfileLimits.HistoryMaxLength, new Vector2(-1, 110f * scale));
+    }
+
+    // --- Right now --------------------------------------------------------
+
+    /// <summary>
+    /// The part of a card that is true today rather than true in general.
+    ///
+    /// Borrowed wholesale from the addon culture that has had it for years, including the thing that
+    /// makes it work: the live line is saved the moment you write it, never on the card's save button,
+    /// because a field you have to remember to publish is a field that goes stale in a week.
+    /// </summary>
+    private void DrawRightNow(float scale)
+    {
+        Ornament.Text(Theme.BrassBright, "Are you in character?");
+        Ornament.TextWrapped(Theme.MutedDeep,
+            "The single most useful thing a card can say, and the one thing a fixed profile cannot.");
+
+        DrawStanceOption(RpStance.Unstated, "Not saying", "The default, and what every card starts as.");
+        ImGui.SameLine(0, 6f * scale);
+        DrawStanceOption(RpStance.InCharacter, "In character", "Approach me as my character.");
+        ImGui.SameLine(0, 6f * scale);
+        DrawStanceOption(RpStance.OutOfCharacter, "Out of character", "Here, but not playing right now.");
+
+        Ornament.FleuronDivider(Theme.BrassDim);
+
+        Ornament.Text(Theme.BrassBright, "Currently");
+
+        if (editing is { } profile)
+        {
+            Ornament.TextWrapped(Theme.MutedDeep,
+                "What they are doing, in their own voice. Saved the moment you write it, not when you save\n"
+                + "the card. You can also set it without opening this window, with /beacon currently.");
+
+            ImGui.SetNextItemWidth(-1);
+            ImGui.InputTextWithHint("##currently", "Camped above the falls, drying out", ref currently, ProfileLimits.CurrentlyMaxLength);
+
+            if (ImGui.Button("Set it"))
+                profiles.SetCurrently(profile, currently, stance);
+
+            ImGui.SameLine();
+
+            if (ImGui.Button("Clear it"))
+            {
+                currently = string.Empty;
+                profiles.SetCurrently(profile, null, stance);
+            }
+
+            if (profile.Moment.UpdatedAt is { } when)
+            {
+                ImGui.SameLine(0, 10f * scale);
+                Ornament.Text(profile.Moment.IsFresh ? Theme.MutedDeep : Theme.Wax, $"written {Ornament.Ago(when)}");
+            }
+        }
+        else
+        {
+            Ornament.TextWrapped(Theme.MutedDeep,
+                "Publish the card first. The live line is saved on its own, so it needs somewhere to live.");
+        }
+
+        Ornament.FleuronDivider(Theme.BrassDim);
+
+        Ornament.Text(Theme.BrassBright, "Out of character");
+        Ornament.TextWrapped(Theme.MutedDeep,
+            "You speaking as yourself rather than as your character: a hiatus, a content warning, an\n"
+            + "invitation to ask. Saved with the rest of the card.");
+
+        ImGui.InputTextMultiline(
+            "##ooc",
+            ref outOfCharacter,
+            ProfileLimits.OutOfCharacterMaxLength,
+            new Vector2(-1, 80f * scale));
+    }
+
+    private void DrawStanceOption(RpStance option, string label, string tooltip)
+    {
+        var selected = stance == option;
+
+        ImGui.PushStyleColor(ImGuiCol.Button, selected ? Theme.BrassBright : Theme.PanelRaised);
+        ImGui.PushStyleColor(ImGuiCol.Text, selected ? Theme.Leather : Theme.CreamDim);
+
+        if (ImGui.Button($"{label}##stance{option}"))
+            stance = option;
+
+        ImGui.PopStyleColor(2);
+        Ornament.Tooltip(tooltip);
     }
 
     // --- Player ----------------------------------------------------------
@@ -821,6 +964,12 @@ public sealed class ProfileEditorWindow : Window, IDisposable
             },
             Personality = [.. traits],
             Hooks = hooks.Where(h => !string.IsNullOrWhiteSpace(h)).Select(h => h.Trim()).ToList(),
+            AtFirstGlance = glances
+                .Where(g => !string.IsNullOrWhiteSpace(g.Text))
+                .Select((g, i) => new GlanceNote { Label = g.Label.Trim(), Text = g.Text.Trim(), Order = i })
+                .ToList(),
+            OutOfCharacter = Blank(outOfCharacter),
+            Stance = stance,
             Overview = Blank(overview),
             History = Blank(history),
             Goals = Blank(goals),

@@ -87,6 +87,7 @@ builder.Services.AddBeaconRateLimiting();
 
 builder.Services.AddSingleton<BeaconHub>();
 builder.Services.AddSingleton<ImageService>();
+builder.Services.AddSingleton<StageService>();
 builder.Services.AddScoped<BeaconService>();
 builder.Services.AddScoped<ProfileService>();
 builder.Services.AddHostedService<FlameSweeper>();
@@ -166,6 +167,7 @@ app.UseWebSockets(new WebSocketOptions
 app.MapAccountEndpoints();
 app.MapBeaconEndpoints();
 app.MapImageEndpoints();
+app.MapStageEndpoints();
 app.MapProfileEndpoints();
 
 app.MapGet(ApiRoutes.Health, (HttpContext http, BeaconHub hub, IOptions<BeaconOptions> options) =>

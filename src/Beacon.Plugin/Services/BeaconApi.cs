@@ -177,6 +177,19 @@ public sealed class BeaconApi(Configuration config) : IDisposable
             true,
             ct);
 
+    /// <summary>Rewrites the live line. Its own call so it can be driven from a chat command.</summary>
+    public Task<ApiResult<ProfileDto>> SetCurrentlyAsync(
+        Guid id,
+        string? currently,
+        RpStance? stance,
+        CancellationToken ct) =>
+        SendAsync<ProfileDto>(
+            HttpMethod.Put,
+            ApiRoutes.Profiles.Currently(id),
+            new SetCurrentlyRequest { Currently = currently, Stance = stance },
+            true,
+            ct);
+
     public Task<ApiResult<ProfileDto>> UploadPortraitAsync(Guid id, byte[] bytes, string fileName, CancellationToken ct) =>
         UploadAsync<ProfileDto>(ApiRoutes.Profiles.Images(id), bytes, fileName, ct);
 
@@ -243,6 +256,61 @@ public sealed class BeaconApi(Configuration config) : IDisposable
 
     public Task<ApiResult<bool>> DeleteImageAsync(Guid beaconId, CancellationToken ct) =>
         SendAsync<bool>(HttpMethod.Delete, ApiRoutes.Beacons.Image(beaconId), null, true, ct);
+
+    // --- Stages ---------------------------------------------------------
+
+    /// <summary>
+    /// Publishes a Stagehand stage for a beacon. The definition is sent as it sits on disk: Beacon
+    /// does not rewrite somebody's stage, it only carries it.
+    /// </summary>
+    public async Task<ApiResult<BeaconStageInfo>> UploadStageAsync(Guid beaconId, byte[] definition, CancellationToken ct)
+    {
+        try
+        {
+            using var content = new ByteArrayContent(definition);
+            content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+
+            using var request = new HttpRequestMessage(HttpMethod.Put, Url(ApiRoutes.Beacons.Stage(beaconId)))
+            {
+                Content = content,
+            };
+            ApplyHeaders(request, authenticated: true);
+
+            using var response = await http.SendAsync(request, ct);
+            return await ReadAsync<BeaconStageInfo>(response, ct);
+        }
+        catch (Exception ex)
+        {
+            return Unreachable<BeaconStageInfo>(ex);
+        }
+    }
+
+    public Task<ApiResult<bool>> DeleteStageAsync(Guid beaconId, CancellationToken ct) =>
+        SendAsync<bool>(HttpMethod.Delete, ApiRoutes.Beacons.Stage(beaconId), null, true, ct);
+
+    /// <summary>
+    /// Downloads a beacon's stage definition. Returns the raw document, because it is Stagehand's
+    /// format and not Beacon's to interpret.
+    /// </summary>
+    public async Task<string?> DownloadStageAsync(Guid beaconId, CancellationToken ct)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, Url(ApiRoutes.Beacons.Stage(beaconId)));
+            ApplyHeaders(request, authenticated: true);
+
+            using var response = await http.SendAsync(request, ct);
+            if (!response.IsSuccessStatusCode)
+                return null;
+
+            return await response.Content.ReadAsStringAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            Svc.Log.Debug(ex, "Could not download the stage for beacon {BeaconId}.", beaconId);
+            return null;
+        }
+    }
 
     /// <summary>
     /// Downloads image bytes for the texture cache. Null on any failure; the caller draws a placeholder.

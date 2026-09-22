@@ -463,6 +463,10 @@ public sealed class ChronicleWindow : Window
 
         DrawPresence(profile, scale);
 
+        DrawMoment(profile, scale);
+
+        DrawAtFirstGlance(profile, scale);
+
         if (profile.Personality.Count > 0)
         {
             Ornament.PageLabel("PERSONALITY");
@@ -511,6 +515,72 @@ public sealed class ChronicleWindow : Window
 
         ImGui.Spacing();
         DrawActions(profile, scale);
+    }
+
+    /// <summary>
+    /// The part of the card that is true today: the live line, the IC/OOC flag, and the player's own
+    /// note.
+    ///
+    /// The age of the live line is shown rather than hidden. A "currently" written three weeks ago is
+    /// not current, and presenting it as though it were is the exact failure that makes people stop
+    /// trusting the field at all.
+    /// </summary>
+    private void DrawMoment(ProfileDto profile, float scale)
+    {
+        var moment = profile.Moment;
+        if (!moment.HasAnything)
+            return;
+
+        if (moment.Stance is not RpStance.Unstated)
+        {
+            var inCharacter = moment.Stance is RpStance.InCharacter;
+            Ornament.Tag(
+                inCharacter ? "In character" : "Out of character",
+                inCharacter ? Theme.Wax : Theme.Brass,
+                Theme.Ink);
+
+            ImGui.Spacing();
+        }
+
+        if (!string.IsNullOrWhiteSpace(moment.Currently))
+        {
+            Ornament.PageLabel("CURRENTLY");
+            Ornament.TextWrapped(Theme.Ink, moment.Currently!);
+
+            if (moment.UpdatedAt is { } when)
+                Ornament.Text(moment.IsFresh ? Theme.InkFaint : Theme.Wax, Ornament.Ago(when));
+
+            ImGui.Spacing();
+        }
+
+        if (!string.IsNullOrWhiteSpace(moment.OutOfCharacter))
+        {
+            Ornament.PageLabel("OUT OF CHARACTER");
+            Ornament.TextWrapped(Theme.InkSoft, moment.OutOfCharacter!);
+            ImGui.Spacing();
+        }
+    }
+
+    /// <summary>What a stranger notices before a word is exchanged.</summary>
+    private void DrawAtFirstGlance(ProfileDto profile, float scale)
+    {
+        if (profile.AtFirstGlance.Count == 0)
+            return;
+
+        Ornament.PageLabel("AT FIRST GLANCE");
+
+        foreach (var note in profile.AtFirstGlance)
+        {
+            if (note.Label.Length > 0)
+            {
+                Ornament.Text(Theme.InkFaint, note.Label);
+                ImGui.SameLine(0, 6f * scale);
+            }
+
+            Ornament.TextWrapped(Theme.InkSoft, note.Text);
+        }
+
+        ImGui.Spacing();
     }
 
     private void DrawPortrait(ProfileDto profile, float size, float scale)

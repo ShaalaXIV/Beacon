@@ -1,5 +1,6 @@
 using Beacon.Services;
 using Beacon.Shared.Beacons;
+using Beacon.Shared.Profiles;
 using Beacon.Windows;
 using Dalamud.Game.Command;
 using Dalamud.Interface.Windowing;
@@ -37,6 +38,10 @@ public sealed class Plugin : IDalamudPlugin
 
     private readonly ProfileService profiles;
 
+    private readonly StagehandIpc stagehand;
+
+    private readonly StageDressing stages;
+
     private readonly WindowSystem windows = new("Beacon");
 
     private readonly AtlasWindow atlasWindow;
@@ -64,12 +69,14 @@ public sealed class Plugin : IDalamudPlugin
         hub = new BeaconHubClient(config);
         atlas = new AtlasService(config, api, location, hub, images, notifications);
         travel = new TravelService(config, location);
-        screenshots = new ScreenshotService();
+        screenshots = new ScreenshotService(config);
         dtr = new DtrService(config, atlas, travel);
         profiles = new ProfileService(config, api, location, atlas, notifications);
+        stagehand = new StagehandIpc();
+        stages = new StageDressing(config, api, stagehand, location);
 
-        editorWindow = new BeaconEditorWindow(config, atlas, location, screenshots, images, notifications);
-        settingsWindow = new SettingsWindow(config, api, atlas, hub, travel);
+        editorWindow = new BeaconEditorWindow(config, atlas, location, screenshots, images, notifications, stages);
+        settingsWindow = new SettingsWindow(config, api, atlas, hub, travel, stages);
         atlasWindow = new AtlasWindow(
             config,
             atlas,
@@ -77,6 +84,7 @@ public sealed class Plugin : IDalamudPlugin
             location,
             images,
             notifications,
+            stages,
             editorWindow.Open,
             () => settingsWindow.IsOpen = true,
             OpenChronicle,
@@ -119,6 +127,8 @@ public sealed class Plugin : IDalamudPlugin
                 + "/beacon light - light your nearest beacon\n"
                 + "/beacon out - put out the beacon you lit\n"
                 + "/beacon go <code> - open a beacon by its share code\n"
+                + "/beacon currently <line> - say what your character is doing right now\n"
+                + "/beacon ic | /beacon ooc - mark yourself in or out of character\n"
                 + "/beacon settings - open the settings",
         });
 
@@ -135,6 +145,7 @@ public sealed class Plugin : IDalamudPlugin
         {
             atlas.Start();
             profiles.Start();
+            stages.Start();
         }
 
         Svc.Log.Information("Beacon loaded.");
@@ -142,11 +153,16 @@ public sealed class Plugin : IDalamudPlugin
 
     private void Draw()
     {
+        // Recorded here because the main viewport's id can only be read inside a draw callback, and
+        // a photograph can be triggered from a command or a background continuation.
+        Beacon.UI.Viewport.Record();
+
         windows.Draw();
 
         // The file dialog lives outside the window system and must be drawn every frame, even when
         // the editor that opened it has since been closed.
         screenshots.Draw();
+        stages.Draw();
     }
 
     private void OnFrameworkUpdate(Dalamud.Plugin.Services.IFramework framework)
@@ -155,6 +171,7 @@ public sealed class Plugin : IDalamudPlugin
         {
             atlas.Tick();
             profiles.Tick();
+            stages.Tick(atlas.Beacons);
             travel.Tick();
             dtr.Tick();
         }
@@ -209,6 +226,18 @@ public sealed class Plugin : IDalamudPlugin
                 OpenChronicle();
                 break;
 
+            case "currently" or "doing":
+                SetCurrently(rest);
+                break;
+
+            case "ic":
+                SetStance(RpStance.InCharacter);
+                break;
+
+            case "ooc":
+                SetStance(RpStance.OutOfCharacter);
+                break;
+
             case "settings" or "config":
                 OpenSettings();
                 break;
@@ -217,6 +246,51 @@ public sealed class Plugin : IDalamudPlugin
                 notifications.Error($"Beacon does not know \"{verb}\". Try /beacon on its own.");
                 break;
         }
+    }
+
+    /// <summary>
+    /// Rewrites the live line on the card of the character you are logged in as.
+    ///
+    /// A command rather than only a window, because the whole value of a "currently" is that changing
+    /// it costs nothing. If it takes three clicks it is written once and never again, which is worse
+    /// than not having the field.
+    /// </summary>
+    private void SetCurrently(string text)
+    {
+        if (profiles.MyProfile is not { } profile)
+        {
+            notifications.Error("Write a card for this character first, with /beacon me.");
+            return;
+        }
+
+        var line = text.Trim();
+
+        if (line.Length > ProfileLimits.CurrentlyMaxLength)
+            line = line[..ProfileLimits.CurrentlyMaxLength];
+
+        if (line.Length == 0)
+        {
+            profiles.SetCurrently(profile, null);
+            notifications.Toast("Cleared what you are currently doing.", null);
+            return;
+        }
+
+        profiles.SetCurrently(profile, line);
+        notifications.Toast("Noted.", line);
+    }
+
+    private void SetStance(RpStance stance)
+    {
+        if (profiles.MyProfile is not { } profile)
+        {
+            notifications.Error("Write a card for this character first, with /beacon me.");
+            return;
+        }
+
+        profiles.SetCurrently(profile, profile.Moment.Currently, stance);
+        notifications.Toast(
+            stance is RpStance.InCharacter ? "Marked in character." : "Marked out of character.",
+            null);
     }
 
     /// <summary>
@@ -353,6 +427,7 @@ public sealed class Plugin : IDalamudPlugin
         windows.RemoveAllWindows();
 
         dtr.Dispose();
+        stages.Dispose();
         profiles.Dispose();
         profileEditorWindow.Dispose();
         screenshots.Dispose();

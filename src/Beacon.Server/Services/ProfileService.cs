@@ -36,7 +36,7 @@ public sealed class ProfileService(
     }
 
     private IQueryable<ProfileEntity> WithDetail(IQueryable<ProfileEntity> q) =>
-        q.Include(p => p.Tags).Include(p => p.Hooks).Include(p => p.Images);
+        q.Include(p => p.Tags).Include(p => p.Hooks).Include(p => p.Glances).Include(p => p.Images);
 
     // --- Reads -----------------------------------------------------------
 
@@ -274,13 +274,16 @@ public sealed class ProfileService(
         // diffing them would be more code for an identical result.
         db.ProfileTags.RemoveRange(profile.Tags);
         db.ProfileHooks.RemoveRange(profile.Hooks);
+        db.ProfileGlances.RemoveRange(profile.Glances);
         await db.SaveChangesAsync(ct);
 
         profile.Tags = ProfileMapper.BuildTags(profile.Id, request);
         profile.Hooks = CleanHooks(profile.Id, request.Hooks);
+        profile.Glances = CleanGlances(profile.Id, request.AtFirstGlance);
 
         db.ProfileTags.AddRange(profile.Tags);
         db.ProfileHooks.AddRange(profile.Hooks);
+        db.ProfileGlances.AddRange(profile.Glances);
         await db.SaveChangesAsync(ct);
 
         logger.LogInformation(
@@ -308,6 +311,41 @@ public sealed class ProfileService(
 
         profile.Availability = availability;
         profile.UpdatedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync(ct);
+
+        return OperationResult<ProfileDto>.Ok(await HydrateAsync(profile, ct));
+    }
+
+    /// <summary>
+    /// Rewrites the live line, and only that.
+    ///
+    /// Its own operation because the timestamp matters: a "currently" that inherits the card's general
+    /// UpdatedAt would look freshly written every time somebody fixed a typo in their biography, and
+    /// the whole point of the field is that its age is visible.
+    /// </summary>
+    public async Task<OperationResult<ProfileDto>> SetCurrentlyAsync(
+        Guid id,
+        SetCurrentlyRequest request,
+        AccountEntity caller,
+        CancellationToken ct)
+    {
+        var profile = await WithDetail(db.Profiles).FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted, ct);
+        if (profile is null)
+            return OperationResult<ProfileDto>.NotFound("No such profile.");
+
+        if (profile.OwnerAccountId != caller.Id)
+            return OperationResult<ProfileDto>.Forbidden("That is not your profile.");
+
+        var line = NullIfEmpty(Truncate(Validation.CleanLine(request.Currently), ProfileLimits.CurrentlyMaxLength));
+
+        profile.Currently = line;
+
+        // Clearing the line clears its age too, so an empty "currently" never carries a date.
+        profile.CurrentlyUpdatedAt = line is null ? null : DateTimeOffset.UtcNow;
+
+        if (request.Stance is { } stance)
+            profile.Stance = stance;
+
         await db.SaveChangesAsync(ct);
 
         return OperationResult<ProfileDto>.Ok(await HydrateAsync(profile, ct));
@@ -731,6 +769,12 @@ public sealed class ProfileService(
         // to see any adult content at all, which is the one failure this must not permit.
         profile.IsMature = style.MatureThemes.Count > 0;
 
+        // The live "currently" line is deliberately not touched here. It has its own route so that
+        // rewriting it between scenes does not mean resubmitting a whole card, and so that saving a
+        // biography does not reset its age.
+        profile.OutOfCharacter = NullIfEmpty(Validation.CleanBlock(request.OutOfCharacter));
+        profile.Stance = request.Stance;
+
         profile.PlayerTimezone = NullIfEmpty(Validation.CleanLine(request.Player.Timezone));
         profile.PlayerAvailability = NullIfEmpty(Validation.CleanLine(request.Player.Availability));
         profile.PlayerContact = NullIfEmpty(Validation.CleanLine(request.Player.Contact));
@@ -742,6 +786,34 @@ public sealed class ProfileService(
         profile.Visibility = request.Visibility;
         profile.Availability = request.Availability;
     }
+
+    /// <summary>
+    /// Trims the "at first glance" slots. A slot with no text is dropped entirely rather than stored
+    /// as an empty label, so a half-filled form does not produce blank rows on somebody's card.
+    /// </summary>
+    private static List<ProfileGlanceEntity> CleanGlances(Guid profileId, IReadOnlyList<GlanceNote> notes)
+    {
+        var order = 0;
+        return notes
+            .Select(n => new
+            {
+                Label = Truncate(Validation.CleanLine(n.Label), ProfileLimits.GlanceLabelMaxLength),
+                Text = Truncate(Validation.CleanLine(n.Text), ProfileLimits.GlanceTextMaxLength),
+            })
+            .Where(n => n.Text.Length > 0)
+            .Take(ProfileLimits.MaxGlanceNotes)
+            .Select(n => new ProfileGlanceEntity
+            {
+                Id = Guid.NewGuid(),
+                ProfileId = profileId,
+                Label = n.Label,
+                Text = n.Text,
+                Order = order++,
+            })
+            .ToList();
+    }
+
+    private static string Truncate(string value, int max) => value.Length > max ? value[..max] : value;
 
     private static List<ProfileHookEntity> CleanHooks(Guid profileId, IReadOnlyList<string> hooks)
     {

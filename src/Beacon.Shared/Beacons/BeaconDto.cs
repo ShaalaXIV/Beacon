@@ -49,6 +49,12 @@ public sealed record BeaconDto
     /// <summary>Uploaded screenshot, if any. Resolve through the image endpoints.</summary>
     public Guid? ImageId { get; init; }
 
+    /// <summary>
+    /// The stage this place is dressed with, if its keeper built one. Metadata only: the definition
+    /// is fetched separately, by whoever chooses to load it.
+    /// </summary>
+    public BeaconStageInfo? Stage { get; init; }
+
     /// <summary>Free-form tags for filtering: "tavern", "combat-rp", "18+", "drop-in".</summary>
     public IReadOnlyList<string> Tags { get; init; } = [];
 
@@ -79,6 +85,9 @@ public sealed record BeaconDto
     /// <summary>True when this beacon has a screenshot to show.</summary>
     [JsonIgnore]
     public bool HasImage => ImageId is not null && ImageId != Guid.Empty;
+
+    /// <summary>True when there is something for a guest with Stagehand to load.</summary>
+    public bool HasStage => Stage is not null;
 
     /// <summary>"Il Mheg  -  Balmung (Crystal)", the one-line answer to "where is this".</summary>
     [JsonIgnore]

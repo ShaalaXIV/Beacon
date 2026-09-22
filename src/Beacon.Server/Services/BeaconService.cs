@@ -170,10 +170,17 @@ public sealed class BeaconService(
 
         var favoriteSet = favorites.ToHashSet();
 
+        // Stages are described in the listing but never carried in it: a guest sees that a place is
+        // dressed, and fetches the definition itself only if they decide to load it.
+        var stages = await db.Stages
+            .Where(s => ids.Contains(s.BeaconId))
+            .ToDictionaryAsync(s => s.BeaconId, ct);
+
         return rows
             .Select(b => b.ToDto(
                 owners.GetValueOrDefault(b.OwnerAccountId, "Unknown"),
-                favoriteSet.Contains(b.Id)))
+                favoriteSet.Contains(b.Id),
+                stages.GetValueOrDefault(b.Id)))
             .ToList();
     }
 
@@ -532,7 +539,8 @@ public sealed class BeaconService(
         var dto = beacon.ToDto(
             await db.Accounts.Where(a => a.Id == beacon.OwnerAccountId)
                 .Select(a => a.DisplayName).FirstOrDefaultAsync(ct) ?? "Unknown",
-            favorite);
+            favorite,
+            await db.Stages.FirstOrDefaultAsync(s => s.BeaconId == beacon.Id, ct));
 
         return OperationResult<BeaconDto>.Ok(dto);
     }

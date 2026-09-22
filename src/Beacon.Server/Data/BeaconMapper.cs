@@ -68,7 +68,25 @@ public static class BeaconMapper
                 Note = e.LitNote,
             };
 
-    public static BeaconDto ToDto(this BeaconEntity e, string ownerName, bool isFavorite = false) =>
+    /// <summary>Describes a stored stage on the wire. Metadata only; the definition has its own route.</summary>
+    public static BeaconStageInfo ToInfo(this BeaconStageEntity e) =>
+        new()
+        {
+            Name = e.Name,
+            AuthorName = e.AuthorName,
+            Description = e.Description,
+            IntendedTerritoryType = e.IntendedTerritoryType,
+            ObjectCount = e.ObjectCount,
+            ModpackCount = e.ModpackCount,
+            SizeBytes = e.SizeBytes,
+            UpdatedAt = e.UpdatedAt,
+        };
+
+    public static BeaconDto ToDto(
+        this BeaconEntity e,
+        string ownerName,
+        bool isFavorite = false,
+        BeaconStageEntity? stage = null) =>
         new()
         {
             Id = e.Id,
@@ -102,6 +120,7 @@ public static class BeaconMapper
             Flame = e.ToFlame(),
             AllowPublicLighting = e.AllowPublicLighting,
             ImageId = e.ImageId,
+            Stage = stage?.ToInfo(),
             Tags = SplitTags(e.TagsCsv),
             Visibility = e.Visibility,
             ShareCode = e.ShareCode,
