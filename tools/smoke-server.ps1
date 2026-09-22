@@ -31,7 +31,15 @@ function Get-FreeLoopbackPort {
 function Start-BeaconServer([int]$Port) {
     $start = [System.Diagnostics.ProcessStartInfo]::new()
     $start.FileName = 'dotnet'
-    $start.ArgumentList.Add((Join-Path $published 'Beacon.Server.dll'))
+    # ArgumentList is .NET Core only. On Windows PowerShell 5.1 the only way through is the quoted
+    # Arguments string, and the published path can contain spaces.
+    $serverDll = Join-Path $published 'Beacon.Server.dll'
+    if ($null -ne $start.PSObject.Properties['ArgumentList']) {
+        $start.ArgumentList.Add($serverDll)
+    }
+    else {
+        $start.Arguments = '"' + $serverDll + '"'
+    }
     $start.WorkingDirectory = $published
     $start.UseShellExecute = $false
     $start.CreateNoWindow = $true
@@ -52,7 +60,14 @@ function Stop-BeaconServer($ServerProcess) {
         return
     }
 
-    $ServerProcess.Kill($true)
+    # Kill(entireProcessTree) is .NET Core only; 5.1 has the parameterless overload.
+    try {
+        $ServerProcess.Kill($true)
+    }
+    catch [System.Management.Automation.MethodException] {
+        $ServerProcess.Kill()
+    }
+
     $ServerProcess.WaitForExit()
     $ServerProcess.Dispose()
 }
