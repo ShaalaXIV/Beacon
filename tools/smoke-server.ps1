@@ -4,6 +4,12 @@ param()
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
+# Windows PowerShell 5.1 does not load System.Net.Http by default, and the release gate has to be
+# runnable on whatever shell the release machine actually has rather than only on PowerShell 7.
+if (-not ('System.Net.Http.HttpClient' -as [type])) {
+    Add-Type -AssemblyName System.Net.Http
+}
+
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $scratch = Join-Path ([System.IO.Path]::GetTempPath()) ("beacon-smoke-" + [guid]::NewGuid().ToString('N'))
 $published = Join-Path $scratch 'server'
@@ -25,7 +31,15 @@ function Get-FreeLoopbackPort {
 function Start-BeaconServer([int]$Port) {
     $start = [System.Diagnostics.ProcessStartInfo]::new()
     $start.FileName = 'dotnet'
-    $start.ArgumentList.Add((Join-Path $published 'Beacon.Server.dll'))
+    # ArgumentList is .NET Core only. On Windows PowerShell 5.1 the only way through is the quoted
+    # Arguments string, and the published path can contain spaces.
+    $serverDll = Join-Path $published 'Beacon.Server.dll'
+    if ($null -ne $start.PSObject.Properties['ArgumentList']) {
+        $start.ArgumentList.Add($serverDll)
+    }
+    else {
+        $start.Arguments = '"' + $serverDll + '"'
+    }
     $start.WorkingDirectory = $published
     $start.UseShellExecute = $false
     $start.CreateNoWindow = $true
@@ -46,7 +60,14 @@ function Stop-BeaconServer($ServerProcess) {
         return
     }
 
-    $ServerProcess.Kill($true)
+    # Kill(entireProcessTree) is .NET Core only; 5.1 has the parameterless overload.
+    try {
+        $ServerProcess.Kill($true)
+    }
+    catch [System.Management.Automation.MethodException] {
+        $ServerProcess.Kill()
+    }
+
     $ServerProcess.WaitForExit()
     $ServerProcess.Dispose()
 }
