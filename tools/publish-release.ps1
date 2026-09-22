@@ -29,7 +29,9 @@ try {
     Copy-Item -LiteralPath 'src/Beacon.Plugin/bin/Release/Beacon/latest.zip' -Destination $destination -Force
 
     $hash = Get-FileHash -LiteralPath $destination -Algorithm SHA256
-    Set-Content -LiteralPath "$destination.sha256" -Value "$($hash.Hash.ToLowerInvariant())  $([IO.Path]::GetFileName($destination))" -Encoding utf8NoBOM
+    # -Encoding utf8NoBOM is PowerShell 7 only, and a BOM in a checksum file breaks sha256sum -c.
+    $checksumLine = "$($hash.Hash.ToLowerInvariant())  $([IO.Path]::GetFileName($destination))"
+    [IO.File]::WriteAllText("$destination.sha256", $checksumLine + "`n", [Text.UTF8Encoding]::new($false))
 
     Write-Host "Release package: $destination"
     Write-Host "SHA-256: $($hash.Hash.ToLowerInvariant())"
