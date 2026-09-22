@@ -4,6 +4,12 @@ param()
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
+# Windows PowerShell 5.1 does not load System.Net.Http by default, and the release gate has to be
+# runnable on whatever shell the release machine actually has rather than only on PowerShell 7.
+if (-not ('System.Net.Http.HttpClient' -as [type])) {
+    Add-Type -AssemblyName System.Net.Http
+}
+
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $scratch = Join-Path ([System.IO.Path]::GetTempPath()) ("beacon-smoke-" + [guid]::NewGuid().ToString('N'))
 $published = Join-Path $scratch 'server'
