@@ -4,7 +4,7 @@
     <!-- Drives the built DLL, the generated manifest, and the folder Dalamud loads it from. -->
     <AssemblyName>Beacon</AssemblyName>
     <RootNamespace>Beacon</RootNamespace>
-    <Version>0.1.8.0</Version>
+    <Version>0.1.9.0</Version>
     <!-- The Dalamud SDK does not turn these on, and every service file wants System.Threading.Tasks. -->
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
@@ -12,7 +12,7 @@
   <!-- Consumed by DalamudPackager to generate Beacon.json next to the assembly. -->
   <PropertyGroup>
     <Name>Beacon</Name>
-    <Author>Scott</Author>
+    <Author>ShaalaXIV</Author>
     <Punchline>Find the fires. Light your own.</Punchline>
     <Description>A directory of roleplay beacons anywhere in the world, not just in housing wards. Raise a beacon where your camp, court or crossroads actually is, describe it, show a screenshot, and let anyone travel to it across worlds and data centres. Light your beacon when you are there and open to play, and the atlas shows who is out there right now. Use /beacon to open the atlas.</Description>
     <Tags>roleplay;rp;travel;social;beacons</Tags>
