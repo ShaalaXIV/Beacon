@@ -424,6 +424,51 @@ public sealed class AtlasService(
         }, lifetime.Token);
     }
 
+    /// <summary>
+    /// Publishes a Stagehand stage for a beacon, so guests can see the place as its keeper dressed it.
+    /// The definition is sent exactly as it sits on disk.
+    /// </summary>
+    public void AttachStage(Guid id, byte[] definition)
+    {
+        _ = Task.Run(async () =>
+        {
+            var result = await api.UploadStageAsync(id, definition, lifetime.Token);
+
+            Post(() =>
+            {
+                if (!result.Ok)
+                {
+                    LastError = result.Error;
+                    return;
+                }
+
+                notifications.Toast("Stage published.", null);
+                Refresh(quiet: true);
+                RefreshMine();
+            });
+        }, lifetime.Token);
+    }
+
+    public void RemoveStage(Guid id)
+    {
+        _ = Task.Run(async () =>
+        {
+            var result = await api.DeleteStageAsync(id, lifetime.Token);
+
+            Post(() =>
+            {
+                if (!result.Ok)
+                {
+                    LastError = result.Error;
+                    return;
+                }
+
+                Refresh(quiet: true);
+                RefreshMine();
+            });
+        }, lifetime.Token);
+    }
+
     public void Delete(BeaconDto beacon)
     {
         _ = Task.Run(async () =>

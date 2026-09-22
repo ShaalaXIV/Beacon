@@ -29,6 +29,18 @@ public sealed record SaveProfileRequest
     /// <summary>Replaces the hook list wholesale. Order is the order given.</summary>
     public IReadOnlyList<string> Hooks { get; init; } = [];
 
+    /// <summary>What a stranger notices first. Ordered as given.</summary>
+    public IReadOnlyList<GlanceNote> AtFirstGlance { get; init; } = [];
+
+    /// <summary>
+    /// The out-of-character note and the IC/OOC flag. The live "currently" line is deliberately not
+    /// here: it has its own route so it can be rewritten from a chat command without resubmitting a
+    /// whole profile.
+    /// </summary>
+    public string? OutOfCharacter { get; init; }
+
+    public RpStance Stance { get; init; }
+
     public string? Overview { get; init; }
 
     public string? History { get; init; }
@@ -53,6 +65,21 @@ public sealed record ConfirmAdultRequest
 }
 
 /// <summary>Sets just the availability override, for the one-click "I am busy" toggle.</summary>
+/// <summary>
+/// Rewrites the live line, and nothing else.
+///
+/// Its own route on purpose. The whole value of a "currently" is that updating it is a ten-second act
+/// between scenes; making it a profile save means it is set once when the card is written and never
+/// again, which is how this field dies in every tool that buries it in an editor.
+/// </summary>
+public sealed record SetCurrentlyRequest
+{
+    public string? Currently { get; init; }
+
+    /// <summary>Optional: set the IC/OOC flag in the same breath.</summary>
+    public RpStance? Stance { get; init; }
+}
+
 public sealed record SetAvailabilityRequest
 {
     public AvailabilityOverride Availability { get; init; }

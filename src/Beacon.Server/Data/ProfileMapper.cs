@@ -111,6 +111,17 @@ public static class ProfileMapper
                 Contact = e.PlayerContact,
             },
             Presence = BuildPresence(e, litBeacon),
+            Moment = new ProfileMoment
+            {
+                Currently = e.Currently,
+                OutOfCharacter = e.OutOfCharacter,
+                Stance = e.Stance,
+                UpdatedAt = e.CurrentlyUpdatedAt,
+            },
+            AtFirstGlance = e.Glances
+                .OrderBy(g => g.Order)
+                .Select(g => new GlanceNote { Label = g.Label, Text = g.Text, Order = g.Order })
+                .ToList(),
             Personality = TagsOf<PersonalityTrait>(e.Tags, ProfileTagKind.Personality),
             Hooks = e.Hooks
                 .OrderBy(h => h.Order)

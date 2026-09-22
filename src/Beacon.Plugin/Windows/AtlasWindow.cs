@@ -26,6 +26,8 @@ public sealed class AtlasWindow : Window
 
     private readonly NotificationService notifications;
 
+    private readonly StageDressing stages;
+
     private readonly Action<BeaconDto?> openEditor;
 
     private readonly Action openSettings;
@@ -53,6 +55,7 @@ public sealed class AtlasWindow : Window
         LocationService location,
         ImageCache images,
         NotificationService notifications,
+        StageDressing stages,
         Action<BeaconDto?> openEditor,
         Action openSettings,
         Action openChronicle,
@@ -65,6 +68,7 @@ public sealed class AtlasWindow : Window
         this.location = location;
         this.images = images;
         this.notifications = notifications;
+        this.stages = stages;
         this.openEditor = openEditor;
         this.openSettings = openSettings;
         this.openChronicle = openChronicle;
@@ -535,11 +539,90 @@ public sealed class AtlasWindow : Window
             ImGui.NewLine();
         }
 
+        DrawStage(beacon, scale);
+
         ImGui.Spacing();
         DrawRoute(beacon, scale);
 
         ImGui.Spacing();
         DrawActions(beacon, scale);
+    }
+
+    /// <summary>
+    /// The stage a keeper dressed this place with, and the guest's decision about it.
+    ///
+    /// Nothing here loads anything on its own. A stage is another player's scenery appearing on your
+    /// screen, so the first time is always a question, and the answer is remembered per beacon.
+    /// </summary>
+    private void DrawStage(BeaconDto beacon, float scale)
+    {
+        if (beacon.Stage is not { } stage)
+            return;
+
+        ImGui.Spacing();
+        Ornament.PageLabel("Dressed with a stage");
+
+        var title = stage.Name.Length > 0 ? stage.Name : "A stage";
+        var credit = stage.AuthorName.Length > 0 ? $"  ·  built by {stage.AuthorName}" : string.Empty;
+        Ornament.Text(Theme.Ink, $"{title}{credit}");
+
+        Ornament.Text(Theme.InkFaint, $"{stage.Weight}  ·  {Ornament.Bytes(stage.SizeBytes)}");
+
+        if (!stages.Available)
+        {
+            Ornament.TextWrapped(
+                Theme.InkFaint,
+                "Install Stagehand to see this place the way its keeper built it.");
+            return;
+        }
+
+        if (stage.IntendedTerritoryType != 0 && stage.IntendedTerritoryType != beacon.Location.TerritoryId)
+            Ornament.TextWrapped(Theme.Wax, "This stage was built for a different zone and may not sit where it should.");
+
+        switch (stages.StateFor(beacon))
+        {
+            case StageState.Loading:
+                Ornament.Text(Theme.InkFaint, "Fetching the stage...");
+                break;
+
+            case StageState.Showing:
+                if (ImGui.Button("Put the stage away", new Vector2(190f * scale, 0)))
+                    stages.Hide();
+
+                Ornament.Tooltip("Hides it for now. Nothing was ever added to your own Stagehand library.");
+                break;
+
+            case StageState.Failed:
+                Ornament.TextWrapped(Theme.Wax, stages.LastError ?? "That stage could not be loaded.");
+                ImGui.Spacing();
+                if (ImGui.Button("Try again", new Vector2(120f * scale, 0)))
+                    stages.Show(beacon, remember: false);
+
+                break;
+
+            default:
+                if (ImGui.Button("Show me the stage", new Vector2(190f * scale, 0)))
+                    stages.Show(beacon, remember: false);
+
+                Ornament.Tooltip(
+                    "Loads it as a temporary stage. It is never saved into your own Stagehand library," + 
+                    " and it goes away when you leave or put it away.");
+
+                ImGui.SameLine(0, 6f * scale);
+
+                if (ImGui.Button("Always here", new Vector2(120f * scale, 0)))
+                    stages.Show(beacon, remember: true);
+
+                Ornament.Tooltip("Load this beacon's stage whenever you arrive, without asking.");
+
+                ImGui.SameLine(0, 6f * scale);
+
+                if (ImGui.Button("Never", new Vector2(90f * scale, 0)))
+                    stages.Refuse(beacon);
+
+                Ornament.Tooltip("Do not offer this beacon's stage again.");
+                break;
+        }
     }
 
     private void DrawScreenshot(BeaconDto beacon, float scale)

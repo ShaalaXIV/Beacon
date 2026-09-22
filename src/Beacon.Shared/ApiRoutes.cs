@@ -56,6 +56,9 @@ public static class ApiRoutes
         public static string Report(Guid id) => $"{Root}/{id}/report";
 
         public static string Image(Guid id) => $"{Root}/{id}/image";
+
+        /// <summary>The beacon's Stagehand stage: its definition on GET, replaced on PUT.</summary>
+        public static string Stage(Guid id) => $"{Root}/{id}/stage";
     }
 
     public static class Profiles
@@ -69,6 +72,9 @@ public static class ApiRoutes
         public const string Activity = "/api/profiles/activity";
 
         public static string ById(Guid id) => $"{Root}/{id}";
+
+        /// <summary>The live "currently" line, rewritten on its own so a chat command can do it.</summary>
+        public static string Currently(Guid id) => $"{Root}/{id}/currently";
 
         public static string ByShareCode(string code) => $"{Root}/code/{Uri.EscapeDataString(code)}";
 

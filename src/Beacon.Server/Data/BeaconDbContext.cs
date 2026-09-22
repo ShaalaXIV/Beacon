@@ -14,6 +14,8 @@ public class BeaconDbContext(DbContextOptions<BeaconDbContext> options) : DbCont
 
     public DbSet<BeaconImageEntity> Images => Set<BeaconImageEntity>();
 
+    public DbSet<BeaconStageEntity> Stages => Set<BeaconStageEntity>();
+
     public DbSet<BeaconLightEntity> Lights => Set<BeaconLightEntity>();
 
     public DbSet<FavoriteEntity> Favorites => Set<FavoriteEntity>();
@@ -25,6 +27,8 @@ public class BeaconDbContext(DbContextOptions<BeaconDbContext> options) : DbCont
     public DbSet<ProfileTagEntity> ProfileTags => Set<ProfileTagEntity>();
 
     public DbSet<ProfileHookEntity> ProfileHooks => Set<ProfileHookEntity>();
+
+    public DbSet<ProfileGlanceEntity> ProfileGlances => Set<ProfileGlanceEntity>();
 
     public DbSet<ProfileImageEntity> ProfileImages => Set<ProfileImageEntity>();
 
@@ -127,6 +131,15 @@ public class BeaconDbContext(DbContextOptions<BeaconDbContext> options) : DbCont
             e.HasIndex(x => x.BeaconId);
         });
 
+        b.Entity<BeaconStageEntity>(e =>
+        {
+            // One stage per beacon, so the beacon's id is the key rather than a surrogate.
+            e.HasKey(x => x.BeaconId);
+            e.Property(x => x.Name).HasMaxLength(128);
+            e.Property(x => x.AuthorName).HasMaxLength(64);
+            e.Property(x => x.Description).HasMaxLength(512);
+        });
+
         b.Entity<BeaconLightEntity>(e =>
         {
             e.HasKey(x => x.Id);
@@ -170,6 +183,8 @@ public class BeaconDbContext(DbContextOptions<BeaconDbContext> options) : DbCont
             e.Property(x => x.ArchetypeCsv).HasMaxLength(96);
             e.Property(x => x.Quote).HasMaxLength(200);
             e.Property(x => x.Boundaries).HasMaxLength(256);
+            e.Property(x => x.Currently).HasMaxLength(256);
+            e.Property(x => x.OutOfCharacter).HasMaxLength(512);
             e.Property(x => x.PlayerTimezone).HasMaxLength(48);
             e.Property(x => x.PlayerAvailability).HasMaxLength(200);
             e.Property(x => x.PlayerContact).HasMaxLength(96);
@@ -216,6 +231,14 @@ public class BeaconDbContext(DbContextOptions<BeaconDbContext> options) : DbCont
         b.Entity<ProfileHookEntity>(e =>
         {
             e.HasKey(x => x.Id);
+            e.Property(x => x.Text).HasMaxLength(200).IsRequired();
+            e.HasIndex(x => x.ProfileId);
+        });
+
+        b.Entity<ProfileGlanceEntity>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Label).HasMaxLength(48).IsRequired();
             e.Property(x => x.Text).HasMaxLength(200).IsRequired();
             e.HasIndex(x => x.ProfileId);
         });

@@ -103,6 +103,34 @@ public sealed class Configuration : IPluginConfiguration
 
     public bool LastLitOnlyFilter { get; set; }
 
+    // --- Stages ---------------------------------------------------------
+
+    /// <summary>
+    /// Load a beacon's stage on arrival without asking first.
+    ///
+    /// Off by default on purpose. A stage is another player's scenery appearing on your screen, so the
+    /// first time is always a question. Turn this on once you would rather see every place as its
+    /// keeper built it.
+    /// </summary>
+    public bool AutoLoadStages { get; set; }
+
+    /// <summary>Beacons whose stage you have already agreed to. Loaded on arrival without asking again.</summary>
+    public HashSet<Guid> TrustedStageBeacons { get; set; } = [];
+
+    /// <summary>Beacons whose stage you have declined. Never offered again.</summary>
+    public HashSet<Guid> RefusedStageBeacons { get; set; } = [];
+
+    // --- Photographs ----------------------------------------------------
+
+    /// <summary>Hide the game's interface while the shutter is open, so a photo is of the scene, not the HUD.</summary>
+    public bool HideHudForPhoto { get; set; } = true;
+
+    /// <summary>
+    /// How long to wait after hiding the interface before grabbing the frame. The HUD fades rather
+    /// than vanishing, so a photo taken immediately catches it half-way out.
+    /// </summary>
+    public int PhotoSettleMs { get; set; } = 250;
+
     /// <summary>True once the first-run flow has been completed or dismissed.</summary>
     public bool OnboardingComplete { get; set; }
 

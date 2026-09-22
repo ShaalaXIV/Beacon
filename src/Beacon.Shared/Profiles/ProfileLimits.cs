@@ -40,6 +40,34 @@ public static class ProfileLimits
     public const int HookMaxLength = 140;
     public const int MaxHooks = 5;
 
+    /// <summary>
+    /// The live line: what this character is doing right now.
+    ///
+    /// Short on purpose. It is meant to be rewritten in ten seconds from a chat command between
+    /// scenes, not composed. A field long enough for a paragraph becomes a second biography that
+    /// nobody updates, which is worse than having none.
+    /// </summary>
+    public const int CurrentlyMaxLength = 200;
+
+    /// <summary>The out-of-character note: the player speaking as themselves, not the character.</summary>
+    public const int OutOfCharacterMaxLength = 400;
+
+    /// <summary>
+    /// What a stranger notices before a word is exchanged: height, bearing, the scar, the smell of
+    /// woodsmoke. Five slots, because this is the impression, not the description.
+    /// </summary>
+    public const int MaxGlanceNotes = 5;
+    public const int GlanceLabelMaxLength = 24;
+    public const int GlanceTextMaxLength = 140;
+
+    /// <summary>
+    /// How long a "currently" line stays believable before the card should say how old it is.
+    ///
+    /// A live line that is three weeks old is not live, and silently presenting it as though it were
+    /// is the failure mode this whole field has in every other tool that offers it.
+    /// </summary>
+    public static readonly TimeSpan CurrentlyFreshFor = TimeSpan.FromDays(3);
+
     public const int MaxPersonalityTraits = 6;
     public const int MaxTones = 5;
     public const int MaxActivities = 6;

@@ -29,12 +29,17 @@ EOF
     [ "$(sqlite3 "$work/beacon.db" "SELECT COUNT(*) FROM sqlite_schema WHERE type = 'table' AND name = '__EFMigrationsHistory';")" = "1" ]
     [ "$(sqlite3 "$work/beacon.db" 'SELECT COUNT(*) FROM __EFMigrationsHistory;')" -gt 0 ]
 
-    mkdir -p "$work/images"
+    mkdir -p "$work/images" "$work/stages"
     if [ -d /data/images ]; then
         cp -a /data/images/. "$work/images/"
     fi
 
-    tar -C "$work" -czf "$partial" beacon.db images
+    # Stage definitions live beside the images and are just as unrecoverable if they are missed.
+    if [ -d /data/stages ]; then
+        cp -a /data/stages/. "$work/stages/"
+    fi
+
+    tar -C "$work" -czf "$partial" beacon.db images stages
     mv "$partial" "$final"
     sha256sum "$final" | sed 's#  /backups/#  #' > "${final}.sha256"
 

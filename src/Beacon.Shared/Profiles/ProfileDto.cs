@@ -162,6 +162,59 @@ public sealed record ProfilePresence
 }
 
 /// <summary>A character's roleplay profile, as the Chronicle shows it.</summary>
+/// <summary>
+/// What a stranger notices before a word is exchanged.
+///
+/// A label and a line: "Bearing" / "Stands like someone waiting to be told to leave". Deliberately
+/// free text rather than a fixed set of physical fields, because the useful ones are never the same
+/// twice and a form of Height/Weight/Eyes produces a census entry rather than an impression.
+/// </summary>
+public sealed record GlanceNote
+{
+    public string Label { get; init; } = string.Empty;
+
+    public string Text { get; init; } = string.Empty;
+
+    public int Order { get; init; }
+}
+
+/// <summary>
+/// The part of a card that is true today rather than true in general: what the character is doing
+/// right now, whether the player is in character, and anything they want said out of character.
+///
+/// This is the one piece of a profile that is expected to be wrong if it is not maintained, so it
+/// carries its own timestamp and the card shows the age rather than presenting a month-old line as
+/// though it were current.
+/// </summary>
+public sealed record ProfileMoment
+{
+    public static readonly ProfileMoment None = new();
+
+    /// <summary>What they are doing, in their own voice.</summary>
+    public string? Currently { get; init; }
+
+    /// <summary>The player speaking as themselves: a warning, a hiatus, a "ask me anything".</summary>
+    public string? OutOfCharacter { get; init; }
+
+    /// <summary>Whether the player is in character right now.</summary>
+    public RpStance Stance { get; init; }
+
+    /// <summary>When the live line was last written. Null when it has never been set.</summary>
+    public DateTimeOffset? UpdatedAt { get; init; }
+
+    /// <summary>True when there is anything here at all.</summary>
+    public bool HasAnything =>
+        !string.IsNullOrWhiteSpace(Currently)
+        || !string.IsNullOrWhiteSpace(OutOfCharacter)
+        || Stance != RpStance.Unstated;
+
+    /// <summary>
+    /// False once the live line is old enough that showing it without a date would be a small lie.
+    /// </summary>
+    public bool IsFresh =>
+        UpdatedAt is { } when && DateTimeOffset.UtcNow - when < ProfileLimits.CurrentlyFreshFor;
+}
+
 public sealed record ProfileDto
 {
     public Guid Id { get; init; }
@@ -184,6 +237,12 @@ public sealed record ProfileDto
     public PlayerNotes Player { get; init; } = new();
 
     public ProfilePresence Presence { get; init; } = ProfilePresence.Unknown;
+
+    /// <summary>What is true today: the live line, the out-of-character note, and the IC/OOC flag.</summary>
+    public ProfileMoment Moment { get; init; } = ProfileMoment.None;
+
+    /// <summary>What a stranger notices first, before anyone has spoken.</summary>
+    public IReadOnlyList<GlanceNote> AtFirstGlance { get; init; } = [];
 
     public IReadOnlyList<PersonalityTrait> Personality { get; init; } = [];
 
@@ -234,7 +293,7 @@ public sealed record ProfileDto
         get
         {
             var earned = 0;
-            const int Total = 8;
+            const int Total = 9;
 
             if (HasPortrait) earned++;
             if (!string.IsNullOrWhiteSpace(Identity.Name)) earned++;
@@ -244,6 +303,7 @@ public sealed record ProfileDto
             if (Style.Tones.Count > 0 || Style.Activities.Count > 0) earned++;
             if (Identity.Archetype.Count > 0 || !string.IsNullOrWhiteSpace(Identity.Quote)) earned++;
             if (Gallery.Count > 1) earned++;
+            if (AtFirstGlance.Count > 0) earned++;
 
             return earned / (float)Total;
         }

@@ -3,6 +3,7 @@ using System;
 using Beacon.Server.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Beacon.Server.Data.Migrations
 {
     [DbContext(typeof(BeaconDbContext))]
-    partial class BeaconDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260922230017_AddBeaconStages")]
+    partial class AddBeaconStages
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.10");
@@ -427,13 +430,6 @@ namespace Beacon.Server.Data.Migrations
                     b.Property<long>("CreatedAt")
                         .HasColumnType("INTEGER");
 
-                    b.Property<string>("Currently")
-                        .HasMaxLength(256)
-                        .HasColumnType("TEXT");
-
-                    b.Property<long?>("CurrentlyUpdatedAt")
-                        .HasColumnType("INTEGER");
-
                     b.Property<string>("DataCenter")
                         .IsRequired()
                         .HasMaxLength(48)
@@ -466,10 +462,6 @@ namespace Beacon.Server.Data.Migrations
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("OutOfCharacter")
-                        .HasMaxLength(512)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Overview")
@@ -506,9 +498,6 @@ namespace Beacon.Server.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(16)
                         .HasColumnType("TEXT");
-
-                    b.Property<int>("Stance")
-                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Title")
                         .HasMaxLength(80)
@@ -548,35 +537,6 @@ namespace Beacon.Server.Data.Migrations
                     b.HasIndex("IsDeleted", "Visibility", "LastActiveAt");
 
                     b.ToTable("Profiles");
-                });
-
-            modelBuilder.Entity("Beacon.Server.Data.Entities.ProfileGlanceEntity", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Label")
-                        .IsRequired()
-                        .HasMaxLength(48)
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("Order")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<Guid>("ProfileId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Text")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ProfileId");
-
-                    b.ToTable("ProfileGlances");
                 });
 
             modelBuilder.Entity("Beacon.Server.Data.Entities.ProfileHookEntity", b =>
@@ -788,17 +748,6 @@ namespace Beacon.Server.Data.Migrations
                     b.Navigation("Owner");
                 });
 
-            modelBuilder.Entity("Beacon.Server.Data.Entities.ProfileGlanceEntity", b =>
-                {
-                    b.HasOne("Beacon.Server.Data.Entities.ProfileEntity", "Profile")
-                        .WithMany("Glances")
-                        .HasForeignKey("ProfileId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Profile");
-                });
-
             modelBuilder.Entity("Beacon.Server.Data.Entities.ProfileHookEntity", b =>
                 {
                     b.HasOne("Beacon.Server.Data.Entities.ProfileEntity", "Profile")
@@ -857,8 +806,6 @@ namespace Beacon.Server.Data.Migrations
 
             modelBuilder.Entity("Beacon.Server.Data.Entities.ProfileEntity", b =>
                 {
-                    b.Navigation("Glances");
-
                     b.Navigation("Hooks");
 
                     b.Navigation("Images");

@@ -27,6 +27,12 @@ nearest aetheryte, and you add a name, a description, a screenshot and some tags
 it: world visit or DC transfer via Lifestream, teleport to the nearest aetheryte, then walks the last
 stretch with vnavmesh if you have it. An on-screen arrow points the rest of the way.
 
+**Dress the place.** If you have built the spot out in
+[Stagehand](https://github.com/UniversalConquistador/Stagehand), attach that stage to your beacon and
+guests can see your camp the way you built it rather than an empty field. Loading one is always the
+guest's choice: Beacon offers, remembers the answer per beacon, and creates it as a *temporary* stage,
+so nothing is ever written into anybody's own Stagehand library.
+
 **Light the beacon** when you are there and open to roleplay. The atlas shows, live, who is out there
 right now and how long they have said they will be. Mark a beacon as a public commons and anyone
 standing there can light it, so a place stays alive whether or not its keeper is online.
@@ -123,6 +129,7 @@ write outside the repo unless you asked it to.
 |---|---|---|
 | [Lifestream](https://github.com/NightmareXIV/Lifestream) | **Yes**, for travel | World visits, DC transfers, aetheryte teleports. Beacon does not reimplement any of it. |
 | [vnavmesh](https://github.com/awgil/ffxiv_navmesh) | Optional | Walks the last stretch from the aetheryte to the beacon. Without it you arrive at the aetheryte and the overlay points the way. |
+| [Stagehand](https://github.com/UniversalConquistador/Stagehand) | Optional | Shares and loads the scenery a keeper has placed at their beacon. Beacon talks to it over Dalamud IPC and does not link its libraries. |
 
 Everything else (browsing, lighting, screenshots) works with neither installed.
 
@@ -137,6 +144,8 @@ Everything else (browsing, lighting, screenshots) works with neither installed.
 | `/beacon light` | Light the nearest beacon you may light. |
 | `/beacon out` | Put out the beacon you lit. |
 | `/beacon go <code>` | Open a beacon by its share code. |
+| `/beacon currently <line>` | Say what your character is doing right now. |
+| `/beacon ic` / `/beacon ooc` | Mark yourself in or out of character. |
 | `/beacon settings` | Open the settings. |
 
 ---
@@ -169,6 +178,20 @@ A few decisions worth knowing about before changing things:
   decoded pixel count, not file size, because that is what actually stops a decompression bomb.
 - **Screenshots are stored as WebP**, with on-demand PNG transcoding for machines whose imaging stack
   cannot decode WebP. The plugin probes once and asks for whichever it can read.
+- **A stage is never loaded without being asked for.** Someone else's scenery appearing on your
+  screen is a decision, not a detail, so the first encounter with a beacon's stage is always a
+  question. Answers are remembered per beacon, and every stage is created as a Stagehand *temporary*
+  stage that leaves nothing behind.
+- **Stages are stored as opaque documents.** The server reads only what a guest needs in order to
+  decide -- its name, its weight, the zone it was built for -- and refuses the two shapes that cannot
+  work: stages over the size cap, and stages whose modpacks load files from the author's own disk.
+  Understanding the format any more deeply than that would tie the server's release cycle to a game
+  plugin's.
+- **The live line keeps its own timestamp.** A card's "currently" is the one field that is expected
+  to be wrong if it is not maintained, so it records when it was written, the card shows that age, and
+  saving a biography does not make a month-old line look freshly typed. It is also set from a command
+  rather than only an editor, because a field that takes three clicks to change is set once and never
+  again.
 - **The realtime hub drops events for slow clients** rather than buffering without limit. Losing a
   stale flame update for one bad connection is fine; stalling every other client is not.
 

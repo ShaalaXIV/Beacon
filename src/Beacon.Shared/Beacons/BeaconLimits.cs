@@ -46,6 +46,18 @@ public static class BeaconLimits
     /// <summary>Longest edge of the atlas thumbnail.</summary>
     public const int ThumbnailMaxEdge = 320;
 
+    /// <summary>
+    /// Largest stage definition a beacon may carry, in bytes.
+    ///
+    /// A stage that only places game objects is a few tens of kilobytes. One that embeds its own
+    /// modpacks can be far larger, and every visitor who opens the beacon pays for it, so the cap is
+    /// set where "this dresses the place" ends and "this is a mod distribution channel" begins.
+    /// </summary>
+    public const int MaxStageBytes = 2 * 1024 * 1024;
+
+    /// <summary>Most objects a shared stage may place. Past this it is a performance problem for guests.</summary>
+    public const int MaxStageObjects = 400;
+
     /// <summary>How many beacons a single account may own. A limit, not a target.</summary>
     public const int MaxBeaconsPerAccount = 50;
 

@@ -403,6 +403,14 @@ public static class Ornament
     }
 
     /// <summary>Formats a remaining duration the way a person would say it.</summary>
+    /// <summary>A download size in the units a person actually thinks in.</summary>
+    public static string Bytes(long bytes) => bytes switch
+    {
+        >= 1024 * 1024 => $"{bytes / (1024f * 1024f):0.#} MB",
+        >= 1024 => $"{bytes / 1024f:0} KB",
+        _ => $"{bytes} bytes",
+    };
+
     public static string Remaining(TimeSpan span) => span.TotalMinutes switch
     {
         < 1 => "moments left",

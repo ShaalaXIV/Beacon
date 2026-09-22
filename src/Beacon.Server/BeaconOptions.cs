@@ -81,4 +81,7 @@ public sealed class BeaconOptions
 
     public string ImageDirectory(string contentRoot) =>
         Path.Combine(ResolveDataDirectory(contentRoot), "images");
+
+    public string StageDirectory(string contentRoot) =>
+        Path.Combine(ResolveDataDirectory(contentRoot), "stages");
 }

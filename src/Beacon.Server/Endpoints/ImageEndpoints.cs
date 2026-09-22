@@ -109,7 +109,9 @@ public static class ImageEndpoints
             .Select(a => a.DisplayName)
             .FirstOrDefaultAsync(ct) ?? "Unknown";
 
-        var dto = beacon.ToDto(ownerName);
+        var dto = beacon.ToDto(
+            ownerName,
+            stage: await db.Stages.FirstOrDefaultAsync(s => s.BeaconId == beacon.Id, ct));
         hub.Broadcast(new BeaconEvent { Kind = BeaconEventKind.Updated, BeaconId = beacon.Id, Beacon = dto });
 
         return Results.Ok(dto);

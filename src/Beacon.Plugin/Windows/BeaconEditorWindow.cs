@@ -26,6 +26,16 @@ public sealed class BeaconEditorWindow : Window
 
     private readonly ImageCache images;
 
+    private readonly StageDressing stages;
+
+    /// <summary>The stage picked in this editing session, not yet published.</summary>
+    private byte[]? pendingStage;
+
+    private string? pendingStageName;
+
+    /// <summary>The stage already published for the beacon being edited, if any.</summary>
+    private BeaconStageInfo? existingStage;
+
     private readonly NotificationService notifications;
 
     private Guid? editingId;
@@ -64,7 +74,8 @@ public sealed class BeaconEditorWindow : Window
         LocationService location,
         ScreenshotService screenshots,
         ImageCache images,
-        NotificationService notifications)
+        NotificationService notifications,
+        StageDressing stages)
         : base("Raise a beacon###BeaconEditor")
     {
         this.config = config;
@@ -73,6 +84,7 @@ public sealed class BeaconEditorWindow : Window
         this.screenshots = screenshots;
         this.images = images;
         this.notifications = notifications;
+        this.stages = stages;
 
         SizeConstraints = new WindowSizeConstraints
         {
@@ -107,6 +119,9 @@ public sealed class BeaconEditorWindow : Window
             visibility = BeaconVisibility.Public;
             allowPublicLighting = false;
             existingImageId = null;
+            existingStage = null;
+            pendingStage = null;
+            pendingStageName = null;
             WindowName = "Raise a beacon###BeaconEditor";
 
             CaptureHere();
@@ -121,6 +136,9 @@ public sealed class BeaconEditorWindow : Window
             visibility = beacon.Visibility;
             allowPublicLighting = beacon.AllowPublicLighting;
             existingImageId = beacon.ImageId;
+            existingStage = beacon.Stage;
+            pendingStage = null;
+            pendingStageName = null;
 
             // Keep the beacon where it is unless the keeper explicitly moves it.
             capturedLocation = beacon.Location;
@@ -143,6 +161,9 @@ public sealed class BeaconEditorWindow : Window
         Ornament.FleuronDivider(Theme.BrassDim);
 
         DrawScreenshotSection(scale);
+        Ornament.FleuronDivider(Theme.BrassDim);
+
+        DrawStageSection(scale);
         Ornament.FleuronDivider(Theme.BrassDim);
 
         DrawVisibility(scale);
@@ -205,7 +226,7 @@ public sealed class BeaconEditorWindow : Window
         Ornament.Text(Theme.BrassBright, "What it is");
 
         ImGui.SetNextItemWidth(-1);
-        ImGui.InputTextWithHint("##name", "The Bramblewood Camp", ref name, BeaconLimits.NameMaxLength);
+        ImGui.InputTextWithHint("##name", "What this place is called", ref name, BeaconLimits.NameMaxLength);
 
         ImGui.SetNextItemWidth(200f * scale);
         if (ImGui.BeginCombo("##kind", BeaconLabels.Describe(kind)))
@@ -237,7 +258,7 @@ public sealed class BeaconEditorWindow : Window
         Ornament.Text(remaining < 100 ? Theme.Wax : Theme.MutedDeep, $"{remaining} characters left");
 
         ImGui.SetNextItemWidth(-1);
-        ImGui.InputTextWithHint("##tags", "tags, comma separated: tavern, drop-in, lore-friendly", ref tagsText, 200);
+        ImGui.InputTextWithHint("##tags", "tags, comma separated", ref tagsText, 200);
 
         var tags = ParseTags(tagsText);
         if (tags.Count > BeaconLimits.MaxTags)
@@ -301,6 +322,86 @@ public sealed class BeaconEditorWindow : Window
             Ornament.TextWrapped(Theme.MutedDeep,
                 "A picture is what makes a stranger decide to make the trip. Worth the ten seconds.");
         }
+    }
+
+    // --- Stage -----------------------------------------------------------
+
+    /// <summary>
+    /// Attaching the Stagehand stage this place is dressed with, so a guest can see it the way it was
+    /// built rather than an empty field.
+    /// </summary>
+    private void DrawStageSection(float scale)
+    {
+        Ornament.Text(Theme.BrassBright, "Stage");
+
+        if (editingId is null)
+        {
+            Ornament.TextWrapped(
+                Theme.MutedDeep,
+                "Raise the beacon first, then reopen it to attach the stage you built here.");
+            return;
+        }
+
+        if (!stages.Available)
+        {
+            Ornament.TextWrapped(
+                Theme.MutedDeep,
+                "Install Stagehand to share the scenery you have placed here.");
+            return;
+        }
+
+        if (pendingStage is { Length: > 0 })
+        {
+            Ornament.Text(Theme.Cream, $"{pendingStageName}  ·  {Ornament.Bytes(pendingStage.Length)}");
+            Ornament.TextWrapped(Theme.MutedDeep, "Published when you save.");
+
+            if (ImGui.Button("Choose a different stage"))
+                stages.PickStage(OnStagePicked);
+
+            ImGui.SameLine();
+
+            if (ImGui.Button("Clear"))
+            {
+                pendingStage = null;
+                pendingStageName = null;
+            }
+        }
+        else if (existingStage is { } stage)
+        {
+            var title = stage.Name.Length > 0 ? stage.Name : "A stage";
+            Ornament.Text(Theme.Cream, $"{title}  ·  {stage.Weight}  ·  {Ornament.Bytes(stage.SizeBytes)}");
+
+            if (ImGui.Button("Replace the stage"))
+                stages.PickStage(OnStagePicked);
+
+            ImGui.SameLine();
+
+            if (ImGui.Button("Remove it"))
+            {
+                atlas.RemoveStage(editingId.Value);
+                existingStage = null;
+            }
+        }
+        else
+        {
+            if (ImGui.Button("Attach a stage"))
+                stages.PickStage(OnStagePicked);
+
+            Ornament.Tooltip("Pick a stage from your Stagehand library.");
+
+            Ornament.TextWrapped(
+                Theme.MutedDeep,
+                "Guests who run Stagehand will be offered it when they arrive. They choose whether to load it.");
+        }
+
+        if (stages.LastError is { } error)
+            Ornament.TextWrapped(Theme.WaxText, error);
+    }
+
+    private void OnStagePicked(byte[] bytes, string fileName)
+    {
+        pendingStage = bytes;
+        pendingStageName = fileName;
     }
 
     private async Task CaptureScreenshotAsync()
@@ -414,6 +515,13 @@ public sealed class BeaconEditorWindow : Window
                 },
                 pendingImage,
                 pendingImageName);
+
+            if (pendingStage is { Length: > 0 })
+            {
+                atlas.AttachStage(id, pendingStage);
+                pendingStage = null;
+                pendingStageName = null;
+            }
 
             notifications.Toast($"{trimmedName} updated.", null);
             submitting = false;

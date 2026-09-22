@@ -352,6 +352,24 @@ public sealed class ProfileService(
             });
         }, lifetime.Token);
 
+    /// <summary>
+    /// Rewrites the live line on a card. Used by the card itself and by <c>/beacon currently</c>,
+    /// which is the whole point: a line you have to open an editor to change is a line nobody changes.
+    /// </summary>
+    public void SetCurrently(ProfileDto profile, string? currently, RpStance? stance = null) =>
+        _ = Task.Run(async () =>
+        {
+            var result = await api.SetCurrentlyAsync(profile.Id, currently, stance, lifetime.Token);
+
+            Post(() =>
+            {
+                if (result.Ok && result.Value is { } updated)
+                    Upsert(updated);
+                else
+                    LastError = result.Error;
+            });
+        }, lifetime.Token);
+
     public void RemoveImage(ProfileDto profile, Guid imageId) =>
         _ = Task.Run(async () =>
         {

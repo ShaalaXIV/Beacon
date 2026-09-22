@@ -55,6 +55,10 @@ public static class ProfileEndpoints
             .RequireRateLimiting(RateLimits.Write)
             .WithSummary("Override the availability Beacon would otherwise derive.");
 
+        group.MapPut("/{id:guid}/currently", SetCurrentlyAsync)
+            .RequireRateLimiting(RateLimits.Write)
+            .WithSummary("Rewrite the live line: what this character is doing right now.");
+
         group.MapPost("/{id:guid}/images", UploadImageAsync)
             .RequireRateLimiting(RateLimits.Upload)
             .DisableAntiforgery()
@@ -191,6 +195,14 @@ public static class ProfileEndpoints
         ProfileService profiles,
         CancellationToken ct) =>
         (await profiles.SetAvailabilityAsync(id, request.Availability, http.RequireAccount(), ct)).ToHttpResult();
+
+    private static async Task<IResult> SetCurrentlyAsync(
+        Guid id,
+        SetCurrentlyRequest request,
+        HttpContext http,
+        ProfileService profiles,
+        CancellationToken ct) =>
+        (await profiles.SetCurrentlyAsync(id, request, http.RequireAccount(), ct)).ToHttpResult();
 
     private static async Task<IResult> HeartbeatAsync(
         ActivityHeartbeatRequest request,
