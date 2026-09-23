@@ -86,6 +86,11 @@ public sealed class ProfileEditorWindow : Window, IDisposable
     private float portraitPanY = 0.5f;
     private bool portraitLoading;
 
+    /// <summary>The card face, the same one the Chronicle draws, so a preview cannot flatter the truth.</summary>
+    private readonly ProfileCard preview;
+
+    private bool previewing;
+
     private string? validationError;
     private bool saving;
 
@@ -106,6 +111,7 @@ public sealed class ProfileEditorWindow : Window, IDisposable
         this.screenshots = screenshots;
         this.images = images;
         this.notifications = notifications;
+        preview = new ProfileCard(images);
 
         SizeConstraints = new WindowSizeConstraints
         {
@@ -215,6 +221,7 @@ public sealed class ProfileEditorWindow : Window, IDisposable
             WindowName = $"Editing {identity.Name}###BeaconProfileEditor";
         }
 
+        previewing = false;
         IsOpen = true;
     }
 
@@ -225,6 +232,12 @@ public sealed class ProfileEditorWindow : Window, IDisposable
         if (!Svc.InWorld && editing is null)
         {
             Ornament.TextWrapped(Theme.Wax, "Log in to a character before writing their card.");
+            return;
+        }
+
+        if (previewing)
+        {
+            DrawPreview(scale);
             return;
         }
 
@@ -832,6 +845,12 @@ public sealed class ProfileEditorWindow : Window, IDisposable
             _ = SubmitAsync();
 
         ImGui.SameLine();
+        if (ImGui.Button("Preview", new Vector2(90f * scale, 28f * scale)))
+            previewing = true;
+
+        Ornament.Tooltip("See the card the way everybody else will, before you publish it.");
+
+        ImGui.SameLine();
         if (ImGui.Button("Close", new Vector2(90f * scale, 28f * scale)))
             IsOpen = false;
 
@@ -854,6 +873,43 @@ public sealed class ProfileEditorWindow : Window, IDisposable
     }
 
     /// <summary>
+    /// The card exactly as everybody else will read it, drawn by the same code the Chronicle uses.
+    ///
+    /// Not a mock-up of one. The point of a preview is to be trustworthy, and a second implementation
+    /// is only trustworthy until the first one changes.
+    /// </summary>
+    private void DrawPreview(float scale)
+    {
+        Ornament.Text(Theme.BrassBright, "How others will read your card");
+        Ornament.Text(Theme.MutedDeep, "Nothing here is saved yet.");
+
+        ImGui.SameLine(ImGui.GetContentRegionAvail().X - (110f * scale));
+        if (ImGui.Button("Back to editing", new Vector2(110f * scale, 0)))
+        {
+            previewing = false;
+            preview.PendingPortrait = null;
+        }
+
+        Ornament.FleuronDivider(Theme.BrassDim);
+
+        var height = ImGui.GetContentRegionAvail().Y - (40f * scale);
+
+        Theme.PushPage();
+        if (ImGui.BeginChild("##previewPage", new Vector2(0, height), true))
+        {
+            // The picture being considered, not the one it is about to replace.
+            preview.PendingPortrait = pendingPortraitTexture;
+            preview.Draw(BuildDraft(), scale);
+        }
+
+        ImGui.EndChild();
+        Theme.PopPage();
+
+        ImGui.Spacing();
+        DrawCompletionMeter(scale);
+    }
+
+    /// <summary>
     /// A meter showing how filled the card is.
     ///
     /// Never a gate on publishing. It is here because watching a card fill in is what persuades
@@ -861,19 +917,17 @@ public sealed class ProfileEditorWindow : Window, IDisposable
     /// </summary>
     private void DrawCompletionMeter(float scale)
     {
-        var earned = 0;
-        const int Total = 8;
+        // Read from the draft, not from a second copy of the rules. The duplicate that used to live
+        // here had already stopped agreeing with ProfileDto.Completeness.
+        var draft = BuildDraft();
+        var fraction = draft.Completeness;
 
-        if (pendingPortraitTexture is not null || editing?.HasPortrait == true) earned++;
-        if (!string.IsNullOrWhiteSpace(name)) earned++;
-        if (traits.Count > 0) earned++;
-        if (hooks.Any(h => !string.IsNullOrWhiteSpace(h))) earned++;
-        if (!string.IsNullOrWhiteSpace(overview)) earned++;
-        if (tones.Count > 0 || activities.Count > 0) earned++;
-        if (archetype.Any(a => !string.IsNullOrWhiteSpace(a)) || !string.IsNullOrWhiteSpace(quote)) earned++;
-        if (!string.IsNullOrWhiteSpace(goals) || !string.IsNullOrWhiteSpace(history)) earned++;
+        // A picture chosen but not yet uploaded still counts; the draft only knows about saved ones.
+        if (pendingPortraitTexture is not null && !draft.HasPortrait)
+            fraction = Math.Min(1f, fraction + (1f / ProfileDto.CompletenessCriteria));
 
-        var fraction = earned / (float)Total;
+        var total = ProfileDto.CompletenessCriteria;
+        var earned = (int)MathF.Round(fraction * total);
         var width = 160f * scale;
         var origin = ImGui.GetCursorScreenPos();
         var draw = ImGui.GetWindowDrawList();
@@ -891,7 +945,85 @@ public sealed class ProfileEditorWindow : Window, IDisposable
 
         Ornament.Text(
             fraction >= 1f ? Theme.Verdigris : Theme.MutedDeep,
-            fraction >= 1f ? "A full card" : $"{earned} of {Total} filled  ·  publish whenever you like");
+            fraction >= 1f ? "A full card" : $"{earned} of {total} filled  ·  publish whenever you like");
+    }
+
+    /// <summary>
+    /// The card as it stands in the editor right now, shaped exactly like one the server would send.
+    ///
+    /// Built rather than approximated, so the preview and the completeness meter both read the same
+    /// thing every other player will. The meter used to keep its own copy of the rules and had already
+    /// drifted out of agreement with them, which is the whole argument for doing it this way.
+    /// </summary>
+    private ProfileDto BuildDraft()
+    {
+        _ = int.TryParse(age, out var parsedAge);
+
+        return new ProfileDto
+        {
+            Id = editing?.Id ?? Guid.Empty,
+            OwnerAccountId = editing?.OwnerAccountId ?? config.AccountId,
+            CharacterName = editing?.CharacterName ?? location.CurrentCharacterName,
+            WorldId = editing?.WorldId ?? location.CurrentWorldId,
+            WorldName = editing?.WorldName ?? location.CurrentWorldName,
+            DataCenter = editing?.DataCenter ?? location.CurrentDataCenter,
+            Identity = new ProfileIdentity
+            {
+                Name = name.Trim(),
+                Title = Blank(title),
+                Race = Blank(race),
+                Clan = Blank(clan),
+                Age = parsedAge > 0 ? parsedAge : null,
+                Gender = Blank(gender),
+                Archetype = archetype.Where(a => !string.IsNullOrWhiteSpace(a)).Select(a => a.Trim()).ToList(),
+                Quote = Blank(quote),
+            },
+            Style = new ProfileStyle
+            {
+                Length = length,
+                Tones = [.. tones],
+                Activities = [.. activities],
+                Boundaries = Blank(boundaries),
+                WalkupsWelcome = walkups,
+                MatureThemes = [.. matureThemes],
+                IsMature = matureThemes.Count > 0,
+            },
+            Player = new PlayerNotes
+            {
+                Timezone = Blank(timezone),
+                Availability = Blank(playtimes),
+                Contact = Blank(contact),
+            },
+
+            // Presence is the server's to derive from lit beacons, so the preview shows whatever the
+            // card currently has rather than inventing a state.
+            Presence = editing?.Presence ?? ProfilePresence.Unknown,
+            Moment = new ProfileMoment
+            {
+                Currently = Blank(currently),
+                OutOfCharacter = Blank(outOfCharacter),
+                Stance = stance,
+                UpdatedAt = editing?.Moment.UpdatedAt,
+            },
+            AtFirstGlance = glances
+                .Where(g => !string.IsNullOrWhiteSpace(g.Text))
+                .Select((g, i) => new GlanceNote { Label = g.Label.Trim(), Text = g.Text.Trim(), Order = i })
+                .ToList(),
+            Personality = [.. traits],
+            Hooks = hooks
+                .Where(h => !string.IsNullOrWhiteSpace(h))
+                .Select((h, i) => new ProfileHook { Text = h.Trim(), Order = i })
+                .ToList(),
+            Gallery = editing?.Gallery ?? [],
+            Links = editing?.Links ?? [],
+            Overview = Blank(overview),
+            History = Blank(history),
+            Goals = Blank(goals),
+            PortraitImageId = editing?.PortraitImageId,
+            Visibility = visibility,
+            Availability = availability,
+            ShareCode = editing?.ShareCode ?? string.Empty,
+        };
     }
 
     private async Task SubmitAsync()

@@ -296,6 +296,7 @@ public sealed class ProfileService(
             if (portrait is { Length: > 0 })
             {
                 var previousImages = profile.Gallery.Select(image => image.ImageId).ToHashSet();
+                var replacing = profile.PortraitImageId;
                 var uploaded = await api.UploadPortraitAsync(profile.Id, portrait, fileName ?? "portrait.png", lifetime.Token);
                 if (uploaded.Ok && uploaded.Value is { } withImage)
                 {
@@ -320,7 +321,27 @@ public sealed class ProfileService(
                             lifetime.Token);
 
                         if (selected.Ok && selected.Value is { } withPortrait)
+                        {
                             profile = withPortrait;
+
+                            // Retire the likeness this one replaces.
+                            //
+                            // Without this, changing your portrait quietly stacks another image into a
+                            // gallery that holds eight, and the ninth change fails outright with an
+                            // error about a gallery the player never chose to fill. A picture added on
+                            // purpose from the gallery is never the portrait unless it was picked, so
+                            // only discarded portraits are swept up here.
+                            if (replacing is { } previousPortrait && previousPortrait != newImage.ImageId)
+                            {
+                                var removed = await api.RemoveGalleryImageAsync(
+                                    profile.Id,
+                                    previousPortrait,
+                                    lifetime.Token);
+
+                                if (removed.Ok && removed.Value is { } tidied)
+                                    profile = tidied;
+                            }
+                        }
                         else
                             Post(() => LastError = $"The picture uploaded, but could not be selected as the portrait: {selected.Error}");
                     }
