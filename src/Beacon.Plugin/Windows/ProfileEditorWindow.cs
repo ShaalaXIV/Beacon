@@ -86,6 +86,8 @@ public sealed class ProfileEditorWindow : Window, IDisposable
     private float portraitPanY = 0.5f;
     private bool portraitLoading;
 
+    private readonly ImageViewerWindow viewer;
+
     /// <summary>The card face, the same one the Chronicle draws, so a preview cannot flatter the truth.</summary>
     private readonly ProfileCard preview;
 
@@ -101,7 +103,8 @@ public sealed class ProfileEditorWindow : Window, IDisposable
         LocationService location,
         ScreenshotService screenshots,
         ImageCache images,
-        NotificationService notifications)
+        NotificationService notifications,
+        ImageViewerWindow viewer)
         : base("My card###BeaconProfileEditor")
     {
         this.config = config;
@@ -111,7 +114,12 @@ public sealed class ProfileEditorWindow : Window, IDisposable
         this.screenshots = screenshots;
         this.images = images;
         this.notifications = notifications;
-        preview = new ProfileCard(images);
+        this.viewer = viewer;
+        preview = new ProfileCard(images)
+        {
+            OpenImage = id => viewer.Show(id, "Likeness"),
+            OpenGallery = viewer.ShowGallery,
+        };
 
         SizeConstraints = new WindowSizeConstraints
         {
