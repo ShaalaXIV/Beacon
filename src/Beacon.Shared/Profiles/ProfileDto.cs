@@ -287,13 +287,19 @@ public sealed record ProfileDto
     /// is what actually persuades somebody to finish one; refusing to publish an incomplete profile
     /// just means they publish nothing.
     /// </summary>
+    /// <summary>
+    /// How many things the completeness meter looks for. Public so the editor can show "n of m"
+    /// without keeping its own copy of the rules, which is how the two fell out of agreement before.
+    /// </summary>
+    public const int CompletenessCriteria = 9;
+
     [JsonIgnore]
     public float Completeness
     {
         get
         {
             var earned = 0;
-            const int Total = 9;
+            const int Total = CompletenessCriteria;
 
             if (HasPortrait) earned++;
             if (!string.IsNullOrWhiteSpace(Identity.Name)) earned++;
