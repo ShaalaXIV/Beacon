@@ -23,8 +23,16 @@ public sealed class ProfileCard(ImageCache images)
     /// <summary>Set while the reader has asked for the long prose.</summary>
     private bool showLongProse;
 
-    /// <summary>The gallery the reader has opened, if any.</summary>
-    public Guid? ViewingGallery { get; set; }
+    /// <summary>
+    /// Called when the reader clicks a likeness, with the image to show full size.
+    ///
+    /// A callback rather than state of its own: the card draws inside a child window, and anything
+    /// opened from in there has to be drawn by whoever owns the window, not by the card.
+    /// </summary>
+    public Action<Guid>? OpenImage { get; set; }
+
+    /// <summary>Called when the reader asks for the whole gallery.</summary>
+    public Action<ProfileDto>? OpenGallery { get; set; }
 
     /// <summary>
     /// A portrait chosen but not yet uploaded, so the editor's preview shows the picture being
@@ -32,29 +40,42 @@ public sealed class ProfileCard(ImageCache images)
     /// </summary>
     public IDalamudTextureWrap? PendingPortrait { get; set; }
 
-    /// <summary>The card most recently drawn, so the gallery popup has something to show.</summary>
-    private ProfileDto? shown;
-
     /// <summary>Draws the card face.</summary>
-    public void Draw(ProfileDto profile, float scale)
+    public void Draw(ProfileDto profile, float scale) => DrawCardContents(profile, scale);
+
+    /// <summary>Indents the cursor so something of this width sits in the middle of the card.</summary>
+    private static void Centre(float itemWidth, float available)
     {
-        shown = profile;
-        DrawCardContents(profile, scale);
+        var indent = (available - itemWidth) / 2f;
+        if (indent > 0f)
+            ImGui.SetCursorPosX(ImGui.GetCursorPosX() + indent);
     }
+
+    private static void CentreText(string text, float available) => Centre(ImGui.CalcTextSize(text).X, available);
 
     private void DrawCardContents(ProfileDto profile, float scale)
     {
-        var portraitSize = 104f * scale;
+        var width = ImGui.GetContentRegionAvail().X;
 
+        // The likeness leads, centred, at a size worth looking at. Everything else sits beneath it and
+        // scrolls -- a face is what somebody decides on, and it was previously a thumbnail beside a
+        // column of text with half the card left empty.
+        var portraitSize = Math.Clamp(width * 0.52f, 220f * scale, 460f * scale);
+
+        Centre(portraitSize, width);
         DrawPortrait(profile, portraitSize, scale);
 
-        ImGui.SameLine(0, 14f * scale);
-        ImGui.BeginGroup();
+        ImGui.Spacing();
 
+        CentreText(profile.Identity.Name, width);
         Ornament.Text(Theme.Ink, profile.Identity.Name);
 
         if (!string.IsNullOrWhiteSpace(profile.Identity.Title))
-            Ornament.Text(Theme.Wax, $"“{profile.Identity.Title}”");
+        {
+            var title = $"“{profile.Identity.Title}”";
+            CentreText(title, width);
+            Ornament.Text(Theme.Wax, title);
+        }
 
         var details = new List<string>();
         if (!string.IsNullOrWhiteSpace(profile.Identity.Lineage))
@@ -64,11 +85,23 @@ public sealed class ProfileCard(ImageCache images)
             details.Add($"Age {age}");
 
         if (details.Count > 0)
-            Ornament.Text(Theme.InkSoft, string.Join("  ·  ", details));
+        {
+            var line = string.Join("  ·  ", details);
+            CentreText(line, width);
+            Ornament.Text(Theme.InkSoft, line);
+        }
 
         if (profile.Identity.Archetype.Count > 0)
         {
             ImGui.Spacing();
+
+            // Measure the row of chips so it can be centred as a block rather than left-hung.
+            var chipsWidth = 0f;
+            foreach (var word in profile.Identity.Archetype)
+                chipsWidth += ImGui.CalcTextSize(word).X + (18f * scale);
+
+            Centre(chipsWidth, width);
+
             foreach (var word in profile.Identity.Archetype)
             {
                 Ornament.Tag(word, Theme.ParchmentRule, Theme.Ink);
@@ -81,10 +114,14 @@ public sealed class ProfileCard(ImageCache images)
         if (!string.IsNullOrWhiteSpace(profile.Identity.Quote))
         {
             ImGui.Spacing();
-            Ornament.TextWrapped(Theme.InkSoft, $"“{profile.Identity.Quote}”");
-        }
+            var quote = $"“{profile.Identity.Quote}”";
 
-        ImGui.EndGroup();
+            // Only centre a quote that fits on one line; a wrapped one reads better ranged left.
+            if (ImGui.CalcTextSize(quote).X < width)
+                CentreText(quote, width);
+
+            Ornament.TextWrapped(Theme.InkSoft, quote);
+        }
 
         Ornament.FleuronDivider(Theme.ParchmentRule, 4f);
 
@@ -246,12 +283,28 @@ public sealed class ProfileCard(ImageCache images)
 
         draw.AddRect(origin, box, Theme.Brass.Packed(), 0f, ImDrawFlags.None, 1.4f * scale);
 
-        ImGui.Dummy(new Vector2(size, size * 1.25f));
+        // Clicking the likeness opens it at a size you can actually look at.
+        if (portrait is not null && profile.HasPortrait)
+        {
+            ImGui.InvisibleButton($"##portrait{profile.Id}", new Vector2(size, size * 1.25f));
+
+            if (ImGui.IsItemHovered())
+            {
+                ImGui.SetMouseCursor(ImGuiMouseCursor.Hand);
+                draw.AddRect(origin, box, Theme.Gold.Packed(), 0f, ImDrawFlags.None, 2f * scale);
+                Ornament.Tooltip("Click to see it full size.");
+            }
+
+            if (ImGui.IsItemClicked())
+                OpenImage?.Invoke(profile.PortraitImageId!.Value);
+        }
+        else
+            ImGui.Dummy(new Vector2(size, size * 1.25f));
 
         if (profile.Gallery.Count > 1)
         {
             if (ImGui.SmallButton($"Gallery ({profile.Gallery.Count})##gal{profile.Id}"))
-                ViewingGallery = profile.Id;
+                OpenGallery?.Invoke(profile);
         }
 
         ImGui.EndGroup();
@@ -381,68 +434,4 @@ public sealed class ProfileCard(ImageCache images)
         ImGui.Spacing();
     }
 
-    /// <summary>The gallery, shown over the card when the reader opens it.</summary>
-    public void DrawGalleryPopup()
-    {
-        if (ViewingGallery is not { } id)
-            return;
-
-        var profile = shown;
-        if (profile is null || profile.Id != id)
-        {
-            ViewingGallery = null;
-            return;
-        }
-
-        ImGui.OpenPopup("Gallery###BeaconGallery");
-
-        var open = true;
-        ImGui.SetNextWindowSizeConstraints(new Vector2(420, 300), new Vector2(1400, 1000));
-
-        if (!ImGui.BeginPopupModal("Gallery###BeaconGallery", ref open, ImGuiWindowFlags.None))
-        {
-            ViewingGallery = null;
-            return;
-        }
-
-        if (!open)
-        {
-            ViewingGallery = null;
-            ImGui.CloseCurrentPopup();
-            ImGui.EndPopup();
-            return;
-        }
-
-        var scale = ImGuiHelpers.GlobalScale;
-        var width = ImGui.GetContentRegionAvail().X;
-
-        foreach (var image in profile.Gallery)
-        {
-            Ornament.Text(Theme.BrassBright, ProfileLabels.Describe(image.Category));
-
-            if (images.Get(image.ImageId, thumb: false) is { } texture)
-            {
-                var drawWidth = Math.Min(width, 520f * scale);
-                var drawHeight = drawWidth * texture.Height / Math.Max(1f, texture.Width);
-                ImGui.Image(texture.Handle, new Vector2(drawWidth, drawHeight));
-            }
-            else
-            {
-                Ornament.Text(Theme.MutedDeep, "Loading...");
-            }
-
-            if (!string.IsNullOrWhiteSpace(image.Caption))
-                Ornament.TextWrapped(Theme.Muted, image.Caption!);
-
-            Ornament.FleuronDivider(Theme.BrassDim);
-        }
-
-        if (ImGui.Button("Close"))
-        {
-            ViewingGallery = null;
-            ImGui.CloseCurrentPopup();
-        }
-
-        ImGui.EndPopup();
-    }
 }

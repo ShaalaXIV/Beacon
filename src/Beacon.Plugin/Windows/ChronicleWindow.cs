@@ -37,6 +37,8 @@ public sealed class ChronicleWindow : Window
     private string searchText = string.Empty;
 
     /// <summary>The card face, shared with the editor's preview so the two cannot drift.</summary>
+    private readonly ImageViewerWindow viewer;
+
     private readonly ProfileCard card;
 
     public ChronicleWindow(
@@ -47,6 +49,7 @@ public sealed class ChronicleWindow : Window
         LocationService location,
         ImageCache images,
         NotificationService notifications,
+        ImageViewerWindow viewer,
         Action<ProfileDto?> openEditor)
         : base("The Chronicle###BeaconChronicle")
     {
@@ -57,7 +60,12 @@ public sealed class ChronicleWindow : Window
         this.location = location;
         this.images = images;
         this.notifications = notifications;
-        card = new ProfileCard(images);
+        this.viewer = viewer;
+        card = new ProfileCard(images)
+        {
+            OpenImage = id => viewer.Show(id, "Likeness"),
+            OpenGallery = viewer.ShowGallery,
+        };
         this.openEditor = openEditor;
 
         SizeConstraints = new WindowSizeConstraints
@@ -101,7 +109,6 @@ public sealed class ChronicleWindow : Window
         ImGui.EndChild();
 
         DrawStatusBar();
-        card.DrawGalleryPopup();
     }
 
     // --- Filters ---------------------------------------------------------

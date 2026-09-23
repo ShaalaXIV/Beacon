@@ -56,6 +56,8 @@ public sealed class Plugin : IDalamudPlugin
 
     private readonly ProfileEditorWindow profileEditorWindow;
 
+    private readonly ImageViewerWindow imageViewerWindow;
+
     public Plugin(IDalamudPluginInterface pluginInterface)
     {
         Svc.Initialise(pluginInterface);
@@ -75,6 +77,8 @@ public sealed class Plugin : IDalamudPlugin
         stagehand = new StagehandIpc();
         stages = new StageDressing(config, api, stagehand, location);
 
+        imageViewerWindow = new ImageViewerWindow(images);
+
         editorWindow = new BeaconEditorWindow(config, atlas, location, screenshots, images, notifications, stages);
         settingsWindow = new SettingsWindow(config, api, atlas, hub, travel, stages);
         atlasWindow = new AtlasWindow(
@@ -90,7 +94,7 @@ public sealed class Plugin : IDalamudPlugin
             OpenChronicle,
             OpenCharacterCard);
 
-        profileEditorWindow = new ProfileEditorWindow(config, profiles, atlas, location, screenshots, images, notifications);
+        profileEditorWindow = new ProfileEditorWindow(config, profiles, atlas, location, screenshots, images, notifications, imageViewerWindow);
         chronicleWindow = new ChronicleWindow(
             config,
             profiles,
@@ -99,6 +103,7 @@ public sealed class Plugin : IDalamudPlugin
             location,
             images,
             notifications,
+            imageViewerWindow,
             profileEditorWindow.Open);
 
         overlay = new BeaconOverlay(config, atlas, travel, location, () => atlasWindow.IsOpen);
@@ -108,6 +113,7 @@ public sealed class Plugin : IDalamudPlugin
         windows.AddWindow(settingsWindow);
         windows.AddWindow(chronicleWindow);
         windows.AddWindow(profileEditorWindow);
+        windows.AddWindow(imageViewerWindow);
         windows.AddWindow(overlay);
 
         // Restore the filters the player left the atlas on, so it opens where they left off.
