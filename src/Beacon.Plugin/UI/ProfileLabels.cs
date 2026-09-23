@@ -190,7 +190,7 @@ public static class ProfileLabels
             < 90 => "Seen within the hour",
             < 60 * 12 => "Seen today",
             < 60 * 36 => "Seen yesterday",
-            < 60 * 24 * 7 => $"Seen {(int)span.TotalDays} days ago",
+            < 60 * 24 * 7 => (int)span.TotalDays == 1 ? "Seen yesterday" : $"Seen {(int)span.TotalDays} days ago",
             < 60 * 24 * 14 => "Seen last week",
             < 60 * 24 * 60 => $"Seen {(int)(span.TotalDays / 7)} weeks ago",
             _ => "Not seen in months",
