@@ -155,9 +155,29 @@ public static class ImageEndpoints
         BeaconDbContext db,
         CancellationToken ct)
     {
+        // Beacon screenshots and profile gallery images share one store on disk but keep separate
+        // metadata tables. Looking in only the screenshot table is what made every profile portrait
+        // return 404 while its bytes sat on disk the whole time.
         var record = await db.Images.FirstOrDefaultAsync(i => i.Id == imageId, ct);
-        if (record is null)
-            return Results.NotFound();
+
+        string contentType;
+        DateTimeOffset createdAt;
+
+        if (record is not null)
+        {
+            contentType = record.ContentType;
+            createdAt = record.CreatedAt;
+        }
+        else
+        {
+            var gallery = await db.ProfileImages.FirstOrDefaultAsync(i => i.ImageId == imageId, ct);
+            if (gallery is null)
+                return Results.NotFound();
+
+            // The gallery stores no content type because everything in the store is written as WebP.
+            contentType = "image/webp";
+            createdAt = gallery.CreatedAt;
+        }
 
         var wantsPng = string.Equals(format, "png", StringComparison.OrdinalIgnoreCase);
 
@@ -168,16 +188,16 @@ public static class ImageEndpoints
         if (path is null || !File.Exists(path))
             return Results.NotFound();
 
-        var contentType = wantsPng ? "image/png" : record.ContentType;
+        var served = wantsPng ? "image/png" : contentType;
         var variant = $"{(thumb ? "t" : "f")}{(wantsPng ? "p" : "w")}";
 
         // Image ids are never reused and the bytes never change, so this can be cached hard.
         // The tag includes the variant so a PNG and a WebP of the same image never collide in a cache.
         return Results.File(
             path,
-            contentType,
+            served,
             enableRangeProcessing: true,
-            lastModified: record.CreatedAt,
+            lastModified: createdAt,
             entityTag: new Microsoft.Net.Http.Headers.EntityTagHeaderValue($"\"{imageId:N}{variant}\""));
     }
 
