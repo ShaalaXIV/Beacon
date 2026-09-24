@@ -61,14 +61,33 @@ try {
     foreach ($required in @(
         'CreateFromImageAsync',
         'CropToPngAsync',
-        'PortraitOutputWidth = 600',
-        'PortraitOutputHeight = 720',
+        'PortraitOutputWidth = ProfileLimits.PortraitWidth',
+        'PortraitOutputHeight = ProfileLimits.PortraitHeight',
         'PortraitSourceMaxBytes = 25 * 1024 * 1024',
         'draw.AddImage(texture.Handle, origin, box, uv0, uv1)'
     )) {
         if ($profileEditor.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
             throw "The profile preview-and-crop workflow is incomplete: $required"
         }
+    }
+
+    # The crop preview, the stored image and the card have to frame a portrait identically. When they
+    # did not, every face on every card was drawn 4% taller than it was cropped, which is small enough
+    # to go unnamed and large enough to be seen. Guarded here because three files have to agree.
+    $profileLimits = Get-Content -LiteralPath 'src/Beacon.Shared/Profiles/ProfileLimits.cs' -Raw
+    foreach ($required in @(
+        'PortraitWidth = 600',
+        'PortraitHeight = 720',
+        'PortraitAspect = PortraitWidth / (float)PortraitHeight'
+    )) {
+        if ($profileLimits.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+            throw "The shared portrait shape is incomplete: $required"
+        }
+    }
+
+    $profileCard = Get-Content -LiteralPath 'src/Beacon.Plugin/UI/ProfileCard.cs' -Raw
+    if ($profileCard.IndexOf('size / ProfileLimits.PortraitAspect', [StringComparison]::Ordinal) -lt 0) {
+        throw 'The card must frame a portrait at the shape it is cropped to, not a hardcoded ratio.'
     }
 
     $screenshotService = Get-Content -LiteralPath 'src/Beacon.Plugin/Services/ScreenshotService.cs' -Raw
