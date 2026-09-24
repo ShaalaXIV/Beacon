@@ -19,9 +19,10 @@ namespace Beacon.Windows;
 /// </summary>
 public sealed class ProfileEditorWindow : Window, IDisposable
 {
-    private const float PortraitAspect = 5f / 6f;
-    private const int PortraitOutputWidth = 600;
-    private const int PortraitOutputHeight = 720;
+    // One shape for the crop preview, the stored image and the card.
+    private const float PortraitAspect = ProfileLimits.PortraitAspect;
+    private const int PortraitOutputWidth = ProfileLimits.PortraitWidth;
+    private const int PortraitOutputHeight = ProfileLimits.PortraitHeight;
     private const int PortraitSourceMaxBytes = 25 * 1024 * 1024;
     private const long PortraitSourceMaxPixels = 50_000_000;
 
@@ -905,8 +906,16 @@ public sealed class ProfileEditorWindow : Window, IDisposable
         Theme.PushPage();
         if (ImGui.BeginChild("##previewPage", new Vector2(0, height), true))
         {
-            // The picture being considered, not the one it is about to replace.
+            // The picture being considered, not the one it is about to replace -- carrying the crop
+            // the editor is showing, so the preview frames it exactly as the upload will.
             preview.PendingPortrait = pendingPortraitTexture;
+
+            if (pendingPortraitTexture is not null)
+            {
+                var (uv0, uv1) = CropUvs(pendingPortraitTexture);
+                preview.PendingPortraitUv0 = uv0;
+                preview.PendingPortraitUv1 = uv1;
+            }
             preview.Draw(BuildDraft(), scale);
         }
 
