@@ -368,7 +368,17 @@ public sealed class ChronicleWindow : Window
 
         if (profile.HasPortrait && images.Get(profile.PortraitImageId!.Value) is { } texture)
         {
-            draw.AddImage(texture.Handle, at, box);
+            // The row is square and a portrait is not, so take the middle of it rather than squashing
+            // a face to fit.
+            var visible = ProfileLimits.PortraitAspect;
+            var inset = (1f - visible) / 2f;
+
+            draw.AddImage(
+                texture.Handle,
+                at,
+                box,
+                new Vector2(0f, inset),
+                new Vector2(1f, 1f - inset));
         }
         else
         {

@@ -75,6 +75,20 @@ public static class ProfileLimits
     /// <summary>All four mature themes may be set; the cap exists only to bound a malformed request.</summary>
     public const int MaxMatureThemes = 4;
 
+    /// <summary>
+    /// The shape of a portrait, in one place.
+    ///
+    /// The crop preview, the stored image and the card all have to agree on this. When they did not,
+    /// a portrait cropped to 5:6 was drawn into a 4:5 frame and every face on every card was quietly
+    /// stretched by four per cent -- which is exactly the kind of wrongness nobody can name but
+    /// everybody can see.
+    /// </summary>
+    public const int PortraitWidth = 600;
+    public const int PortraitHeight = 720;
+
+    /// <summary>Width over height, so a frame is <c>width / PortraitAspect</c> tall.</summary>
+    public const float PortraitAspect = PortraitWidth / (float)PortraitHeight;
+
     /// <summary>Gallery size. Enough for a proper reference sheet, bounded enough to host.</summary>
     public const int MaxGalleryImages = 8;
     public const int CaptionMaxLength = 80;

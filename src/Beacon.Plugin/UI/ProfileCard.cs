@@ -40,6 +40,11 @@ public sealed class ProfileCard(ImageCache images)
     /// </summary>
     public IDalamudTextureWrap? PendingPortrait { get; set; }
 
+    /// <summary>The crop being applied to <see cref="PendingPortrait"/>, so the preview matches the editor.</summary>
+    public Vector2 PendingPortraitUv0 { get; set; } = Vector2.Zero;
+
+    public Vector2 PendingPortraitUv1 { get; set; } = Vector2.One;
+
     /// <summary>Draws the card face.</summary>
     public void Draw(ProfileDto profile, float scale) => DrawCardContents(profile, scale);
 
@@ -250,14 +255,21 @@ public sealed class ProfileCard(ImageCache images)
 
         var origin = ImGui.GetCursorScreenPos();
         var draw = ImGui.GetWindowDrawList();
-        var box = new Vector2(origin.X + size, origin.Y + (size * 1.25f));
+        var height = size / ProfileLimits.PortraitAspect;
+        var box = new Vector2(origin.X + size, origin.Y + height);
 
         var portrait = PendingPortrait
                        ?? (profile.HasPortrait ? images.Get(profile.PortraitImageId!.Value, thumb: false) : null);
 
         if (portrait is not null)
         {
-            draw.AddImage(portrait.Handle, origin, box);
+            // A stored portrait is already cropped to shape; a pending one is the raw file and carries
+            // the crop the editor is previewing.
+            var (uv0, uv1) = ReferenceEquals(portrait, PendingPortrait)
+                ? (PendingPortraitUv0, PendingPortraitUv1)
+                : (Vector2.Zero, Vector2.One);
+
+            draw.AddImage(portrait.Handle, origin, box, uv0, uv1);
         }
         else if (profile.HasPortrait)
         {
@@ -266,7 +278,7 @@ public sealed class ProfileCard(ImageCache images)
             const string Fetching = "Loading...";
             var fetchingSize = ImGui.CalcTextSize(Fetching);
             draw.AddText(
-                new Vector2(origin.X + ((size - fetchingSize.X) / 2f), origin.Y + ((size * 1.25f - fetchingSize.Y) / 2f)),
+                new Vector2(origin.X + ((size - fetchingSize.X) / 2f), origin.Y + ((height - fetchingSize.Y) / 2f)),
                 Theme.InkFaint.Packed(),
                 Fetching);
         }
@@ -276,7 +288,7 @@ public sealed class ProfileCard(ImageCache images)
             const string Label = "No likeness";
             var textSize = ImGui.CalcTextSize(Label);
             draw.AddText(
-                new Vector2(origin.X + ((size - textSize.X) / 2f), origin.Y + ((size * 1.25f - textSize.Y) / 2f)),
+                new Vector2(origin.X + ((size - textSize.X) / 2f), origin.Y + ((height - textSize.Y) / 2f)),
                 Theme.InkFaint.Packed(),
                 Label);
         }
@@ -286,7 +298,7 @@ public sealed class ProfileCard(ImageCache images)
         // Clicking the likeness opens it at a size you can actually look at.
         if (portrait is not null && profile.HasPortrait)
         {
-            ImGui.InvisibleButton($"##portrait{profile.Id}", new Vector2(size, size * 1.25f));
+            ImGui.InvisibleButton($"##portrait{profile.Id}", new Vector2(size, height));
 
             if (ImGui.IsItemHovered())
             {
@@ -299,7 +311,7 @@ public sealed class ProfileCard(ImageCache images)
                 OpenImage?.Invoke(profile.PortraitImageId!.Value);
         }
         else
-            ImGui.Dummy(new Vector2(size, size * 1.25f));
+            ImGui.Dummy(new Vector2(size, height));
 
         if (profile.Gallery.Count > 1)
         {
