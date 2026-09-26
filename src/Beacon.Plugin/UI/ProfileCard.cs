@@ -273,14 +273,18 @@ public sealed class ProfileCard(ImageCache images)
         }
         else if (profile.HasPortrait)
         {
-            // Fetching. Say so, rather than showing an empty well that reads as "the picture is gone".
+            // Say which it is. Claiming to be loading while the fetch has actually given up is worse
+            // than an empty frame, because it is a lie the reader cannot act on.
             draw.AddRectFilled(origin, box, Theme.ParchmentShade.Packed());
-            const string Fetching = "Loading...";
-            var fetchingSize = ImGui.CalcTextSize(Fetching);
+
+            var struggling = images.Struggling(profile.PortraitImageId!.Value, thumb: false);
+            var label = struggling ? "Picture unavailable" : "Loading...";
+            var labelSize = ImGui.CalcTextSize(label);
+
             draw.AddText(
-                new Vector2(origin.X + ((size - fetchingSize.X) / 2f), origin.Y + ((height - fetchingSize.Y) / 2f)),
-                Theme.InkFaint.Packed(),
-                Fetching);
+                new Vector2(origin.X + ((size - labelSize.X) / 2f), origin.Y + ((height - labelSize.Y) / 2f)),
+                (struggling ? Theme.Wax : Theme.InkFaint).Packed(),
+                label);
         }
         else
         {
