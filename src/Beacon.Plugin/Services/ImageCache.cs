@@ -42,10 +42,24 @@ public sealed class ImageCache(BeaconApi api) : IDisposable
         if (entries.TryGetValue(key, out var existing))
         {
             existing.LastTouched = DateTime.UtcNow;
+
+            // A failed fetch is retried, not remembered for ever.
+            //
+            // The commonest failure by far is asking before the plugin has finished connecting, or a
+            // blink of network at login. Giving up permanently turned a half-second hiccup into a
+            // picture that never appeared again until the game was restarted -- which is exactly what
+            // it looked like from the outside: a portrait that would not stay saved.
+            if (existing.Failed && !existing.Loading && DateTime.UtcNow >= existing.RetryAt)
+            {
+                existing.Failed = false;
+                existing.Loading = true;
+                _ = LoadAsync(key, existing);
+            }
+
             return existing.Texture;
         }
 
-        var entry = new Entry { LastTouched = DateTime.UtcNow };
+        var entry = new Entry { LastTouched = DateTime.UtcNow, Loading = true };
         if (!entries.TryAdd(key, entry))
             return entries.TryGetValue(key, out var raced) ? raced.Texture : null;
 
@@ -73,7 +87,7 @@ public sealed class ImageCache(BeaconApi api) : IDisposable
 
             if (bytes is null || bytes.Length == 0)
             {
-                entry.Failed = true;
+                entry.RecordFailure();
                 return;
             }
 
@@ -87,17 +101,29 @@ public sealed class ImageCache(BeaconApi api) : IDisposable
             }
 
             entry.Texture = texture;
+            entry.Attempts = 0;
         }
         catch (OperationCanceledException)
         {
-            entry.Failed = true;
+            // The plugin is unloading. That is not a failure to remember, and marking it one would
+            // poison the entry for a cache that is about to be thrown away anyway.
         }
         catch (Exception ex)
         {
-            entry.Failed = true;
-            Svc.Log.Warning(ex, "Could not load beacon image {ImageId}.", key.Id);
+            entry.RecordFailure();
+            Svc.Log.Warning(ex, "Could not load beacon image {ImageId}, attempt {Attempt}.", key.Id, entry.Attempts);
+        }
+        finally
+        {
+            entry.Loading = false;
         }
     }
+
+    /// <summary>
+    /// True when an image has failed enough times to say so out loud rather than claim it is loading.
+    /// </summary>
+    public bool Struggling(Guid imageId, bool thumb = true) =>
+        entries.TryGetValue((imageId, thumb), out var entry) && entry.Attempts >= 3;
 
     private bool SupportsWebp()
     {
@@ -164,7 +190,27 @@ public sealed class ImageCache(BeaconApi api) : IDisposable
 
         public bool Failed { get; set; }
 
+        /// <summary>Set while a fetch is in flight, so a retry cannot start a second one.</summary>
+        public bool Loading { get; set; }
+
+        /// <summary>How many times this image has failed in a row. Reset by a success.</summary>
+        public int Attempts { get; set; }
+
+        /// <summary>The earliest a failed entry may be tried again.</summary>
+        public DateTime RetryAt { get; set; }
+
         public bool Disposed { get; private set; }
+
+        /// <summary>
+        /// Records a failure and backs off, so a genuinely missing image is not re-requested every
+        /// frame while a transient one still recovers within a few seconds.
+        /// </summary>
+        public void RecordFailure()
+        {
+            Failed = true;
+            Attempts++;
+            RetryAt = DateTime.UtcNow.AddSeconds(Math.Min(60d, Math.Pow(2d, Math.Min(Attempts, 6))));
+        }
 
         public IDalamudTextureWrap? Texture
         {

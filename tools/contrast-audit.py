@@ -93,6 +93,8 @@ PAIRINGS: list[tuple[str, str, float, str]] = [
     ("InkFaint", "ParchmentShade", BODY, "'last seen' on the card"),
     ("BrassText", "Panel", BODY, "portrait placeholder initial"),
     ("Verdigris", "Well", BODY, "'Loading...' in the editor's portrait well"),
+    ("WaxText", "Well", BODY, "'Picture unavailable' in the editor's portrait well"),
+    ("Wax", "ParchmentShade", BODY, "'Picture unavailable' on the card"),
     ("InkFaint", "ParchmentShade", BODY, "'Loading...' in the card's portrait well"),
     # Ornament.Tag draws an outlined chip, not a filled one: the border is Brass but the label sits
     # on the page behind it. Checking the label against Brass would be measuring a pairing that is
